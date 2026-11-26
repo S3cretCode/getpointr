@@ -25,7 +25,7 @@ import {
   Undo2,
 } from "lucide-react";
 import MockBankApp, { ShieldContext } from "./MockBankApp";
-import { Stage, W, FRAME_PAD } from "./Stage";
+import { Stage, W, FRAME_PAD, IPHONE_CHROME_H } from "./Stage";
 import { MarkerLayer, type TapRipple } from "./Markers";
 import { Logo } from "./Logo";
 import { useRoom, type SendFn } from "@/lib/room";
@@ -87,7 +87,12 @@ export default function HelperView({ room }: { room: string }) {
   const [mainRef, size] = useElementSize<HTMLDivElement>();
 
   const scale =
-    size.w > 0 ? Math.max(0.3, Math.min((size.w - 48 - FRAME_PAD * 2) / W, (size.h - 96 - FRAME_PAD * 2) / hostH, 1.15)) : 1;
+    size.w > 0
+      ? Math.max(
+          0.3,
+          Math.min((size.w - 48 - FRAME_PAD * 2) / W, (size.h - 96 - FRAME_PAD * 2) / (hostH + IPHONE_CHROME_H), 1.1),
+        )
+      : 1;
 
   const addLog = (text: string) => {
     logId.current += 1;

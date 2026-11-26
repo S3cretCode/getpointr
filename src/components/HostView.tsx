@@ -16,7 +16,7 @@ import {
   X,
 } from "lucide-react";
 import MockBankApp from "./MockBankApp";
-import { Stage, W, FRAME_PAD } from "./Stage";
+import { Stage, W, FRAME_PAD, IPHONE_CHROME_H } from "./Stage";
 import { GuideMarker, MarkerLayer } from "./Markers";
 import { Logo } from "./Logo";
 import { useRoom, type SendFn } from "@/lib/room";
@@ -98,7 +98,7 @@ export default function HostView({ room }: { room: string }) {
     H = Math.max(520, Math.round(size.h / scale));
     if (H * scale > size.h) scale = size.h / H;
   } else if (size.w > 0) {
-    scale = Math.min((size.h - 32 - FRAME_PAD * 2) / H, (size.w - 32 - FRAME_PAD * 2) / W, 1.1);
+    scale = Math.min((size.h - 32 - FRAME_PAD * 2) / (H + IPHONE_CHROME_H), (size.w - 32 - FRAME_PAD * 2) / W, 1.05);
   }
 
   const setMarkersBoth = (m: Marker[]) => {
