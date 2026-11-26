@@ -174,14 +174,16 @@ export default function HostView({ room }: { room: string }) {
   const [mainRef, size] = useElementSize<HTMLDivElement>();
 
   const fill = size.w > 0 && size.w < 640;
-  let H = 800;
+  let H = 740;
   let scale = 1;
-  if (fill) {
-    scale = size.w / W;
-    H = Math.max(520, Math.round(size.h / scale));
-    if (H * scale > size.h) scale = size.h / H;
-  } else if (size.w > 0) {
-    scale = Math.min((size.h - 32 - FRAME_PAD * 2) / (H + IPHONE_CHROME_H), (size.w - 32 - FRAME_PAD * 2) / W, 1.04);
+  if (fill && size.h > 0) {
+    // Never shrink logical height below 720 so MockBankApp buttons/tabbar are never clipped
+    // and the helper's mirrored iPhone always keeps true iPhone proportions.
+    const naturalH = Math.round(size.h / (size.w / W));
+    H = Math.max(720, Math.min(844, naturalH));
+    scale = Math.min(size.w / W, size.h / H);
+  } else if (size.w > 0 && size.h > 0) {
+    scale = Math.min((size.h - 24 - FRAME_PAD * 2) / (H + IPHONE_CHROME_H), (size.w - 24 - FRAME_PAD * 2) / W, 1.04);
   }
 
   const setMarkersBoth = (m: Marker[]) => {

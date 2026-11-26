@@ -98,7 +98,7 @@ export default function MockBankApp({ state, onAction }: { state: AppState; onAc
       className={`flex h-full w-full flex-col bg-slate-50 text-slate-950 ${onAction ? "" : "pointer-events-none"}`}
     >
       <Header />
-      <div className="relative flex-1 overflow-hidden">
+      <div className="relative flex-1 overflow-y-auto overflow-x-hidden">
         {state.screen === "home" && <HomeScreen act={act} />}
         {state.screen === "transfer" && <TransferScreen state={state} act={act} />}
         {state.screen === "confirm" && <ConfirmScreen state={state} act={act} />}

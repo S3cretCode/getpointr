@@ -76,11 +76,13 @@ type HeroScene = {
   caption: string;
 };
 
-const LASER_SWEEP_PTS: Pt[] = Array.from({ length: 16 }, (_, i) => {
-  const k = i / 15;
+// Sweeps a smooth figure-8 / arc across the visible middle of the Confirm screen (above CaptionBubble)
+const LASER_SWEEP_PTS: Pt[] = Array.from({ length: 22 }, (_, i) => {
+  const k = i / 21;
+  const angle = k * Math.PI * 1.65 - 0.3;
   return {
-    x: 85 + k * 220,
-    y: 652 + Math.sin(k * Math.PI) * -18,
+    x: 195 + Math.cos(angle) * 118,
+    y: 355 + Math.sin(angle * 2) * 52,
   };
 });
 
@@ -160,18 +162,17 @@ export default function Landing() {
   // Animate the slow laser drag trail when Scene 3 ("laser") is active
   useEffect(() => {
     if (!scene.laserSweep) return;
-    let i = 0;
+    let i = 1;
     const iv = setInterval(() => {
-      i = (i + 1) % (scene.laserSweep!.length + 6);
+      i = (i % (scene.laserSweep!.length + 5)) + 1;
       setLaserStep(i);
-    }, 95);
+    }, 90);
     return () => clearInterval(iv);
   }, [scene]);
 
-  const activeTrail =
-    scene.laserSweep && laserStep > 0
-      ? scene.laserSweep.slice(Math.max(0, laserStep - 10), Math.min(scene.laserSweep.length, laserStep + 1))
-      : [];
+  const activeTrail = scene.laserSweep
+    ? scene.laserSweep.slice(Math.max(0, laserStep - 11), Math.min(scene.laserSweep.length, Math.max(2, laserStep + 1)))
+    : [];
 
   const start = (as: "host" | "helper") => router.push(`/${as}/${newRoomId()}`);
 

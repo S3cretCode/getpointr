@@ -70,7 +70,7 @@ export default function HelperView({ room }: { room: string }) {
 
   const [hostState, setHostState] = useState<AppState>(INITIAL_STATE);
   const hostStateRef = useRef(hostState);
-  const [hostH, setHostH] = useState(760);
+  const [hostH, setHostH] = useState(740);
   const [markers, setMarkers] = useState<Marker[]>([]);
   const markersRef = useRef<Marker[]>([]);
   const [tool, setTool] = useState<Tool>("ring");
@@ -98,13 +98,18 @@ export default function HelperView({ room }: { room: string }) {
   const press = useRef<{ x: number; y: number; drag: boolean; last: number; path: Pt[] } | null>(null);
   const [mainRef, size] = useElementSize<HTMLDivElement>();
 
+  const safeHostH = Math.max(700, hostH);
   const scale =
-    size.w > 0
+    size.w > 0 && size.h > 0
       ? Math.max(
-          0.3,
-          Math.min((size.w - 48 - FRAME_PAD * 2) / W, (size.h - 110 - FRAME_PAD * 2) / (hostH + IPHONE_CHROME_H), 1.06),
+          0.32,
+          Math.min(
+            (size.w - 32 - FRAME_PAD * 2) / W,
+            (size.h - 88 - FRAME_PAD * 2) / (safeHostH + IPHONE_CHROME_H),
+            1.06,
+          ),
         )
-      : 1;
+      : 0.72;
 
   const addLog = (text: string) => {
     logId.current += 1;
@@ -216,7 +221,7 @@ export default function HelperView({ room }: { room: string }) {
     const r = stageRef.current!.getBoundingClientRect();
     return {
       x: Math.min(W, Math.max(0, (ev.clientX - r.left) / scale)),
-      y: Math.min(hostH, Math.max(0, (ev.clientY - r.top) / scale)),
+      y: Math.min(safeHostH, Math.max(0, (ev.clientY - r.top) / scale)),
     };
   };
 
@@ -387,7 +392,7 @@ export default function HelperView({ room }: { room: string }) {
 
       <div className="flex min-h-0 flex-1 flex-col lg:flex-row">
         {/* Mirror */}
-        <main ref={mainRef} className="relative flex min-h-[620px] flex-1 flex-col items-center justify-center p-6 lg:min-h-0">
+        <main ref={mainRef} className="relative flex min-h-[480px] flex-1 flex-col items-center justify-center p-4 sm:min-h-[580px] sm:p-6 lg:min-h-0">
           {peer ? (
             <>
               {/* Incoming Help Request Banner from Phone Owner */}
@@ -422,7 +427,7 @@ export default function HelperView({ room }: { room: string }) {
                   View-only (point, never tap)
                 </span>
               </div>
-              <Stage height={hostH} scale={scale} innerRef={stageRef} framed>
+              <Stage height={safeHostH} scale={scale} innerRef={stageRef} framed>
                 <ShieldContext.Provider value={effectiveShield}>
                   <MockBankApp state={hostState} />
                 </ShieldContext.Provider>
