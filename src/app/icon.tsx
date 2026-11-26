@@ -11,18 +11,19 @@ export default function Icon() {
           width: "100%",
           height: "100%",
           borderRadius: 9,
-          background: "#FF6B1A",
+          background: "linear-gradient(145deg, #FF8238 0%, #FF6414 55%, #D9480F 100%)",
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
+          position: "relative",
         }}
       >
         <div
           style={{
-            width: 19,
-            height: 19,
+            width: 20,
+            height: 20,
             borderRadius: "50%",
-            border: "2.4px solid rgba(255,255,255,0.55)",
+            border: "2.5px solid rgba(255,255,255,0.6)",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",

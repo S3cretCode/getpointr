@@ -45,12 +45,11 @@ export function MarkerGlyph({
     );
   }
 
-  // Arrow flips so it never points in from off-screen.
   const flipX = x < 90 ? -1 : 1;
   const flipY = y < 90 ? -1 : 1;
   return (
     <div className="relative h-0 w-0">
-      {[0, 0.53, 1.06].map((d) => (
+      {[0, 0.58, 1.16].map((d) => (
         <span
           key={d}
           className="gp-ring absolute -left-11 -top-11 h-22 w-22 rounded-full border-[3px] border-laser"
@@ -72,7 +71,7 @@ export function MarkerGlyph({
             aria-hidden="true"
           >
             <path d="M6 6 L56 56 M56 30 L56 56 L30 56" stroke="white" strokeWidth="12" />
-            <path d="M6 6 L56 56 M56 30 L56 56 L30 56" stroke="#FF6B1A" strokeWidth="7" />
+            <path d="M6 6 L56 56 M56 30 L56 56 L30 56" stroke="#FF6414" strokeWidth="7" />
           </svg>
         </div>
       )}
@@ -100,24 +99,54 @@ export function MarkerLayer({
           <polyline
             points={steps.map((s) => `${s.x},${s.y}`).join(" ")}
             fill="none"
-            stroke="#FF6B1A"
+            stroke="#FF6414"
             strokeWidth="3"
             strokeDasharray="1 9"
             strokeLinecap="round"
-            opacity="0.85"
+            opacity="0.88"
           />
         </svg>
       )}
+
+      {/* Smooth glowing path line underneath the laser comet */}
+      {trail.length > 1 && (
+        <svg className="absolute inset-0 h-full w-full" aria-hidden="true">
+          <polyline
+            points={trail.map((p) => `${p.x},${p.y}`).join(" ")}
+            fill="none"
+            stroke="#FFFFFF"
+            strokeWidth="9"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            opacity="0.7"
+          />
+          <polyline
+            points={trail.map((p) => `${p.x},${p.y}`).join(" ")}
+            fill="none"
+            stroke="#FF6414"
+            strokeWidth="5.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            opacity="0.92"
+          />
+        </svg>
+      )}
+
+      {/* High-visibility electric-blue owner tap ripples */}
       {taps.map((t) => (
         <span key={t.id} className="absolute" style={{ left: t.x, top: t.y }}>
-          <span className="gp-tap absolute -left-6 -top-6 block h-12 w-12 rounded-full border-2 border-sky-400 bg-sky-400/25" />
+          <span className="gp-tap-wave absolute -left-9 -top-9 block h-18 w-18 rounded-full border-[3.5px] border-sky-400 bg-sky-400/25 shadow-[0_0_24px_4px_rgba(14,165,233,0.55)]" />
+          <span className="gp-tap-wave-delay absolute -left-7 -top-7 block h-14 w-14 rounded-full border-[3px] border-cyan-300 bg-sky-500/20" />
+          <span className="gp-tap-core absolute -left-3 -top-3 block h-6 w-6 rounded-full bg-sky-500 ring-[3px] ring-white shadow-[0_0_16px_4px_rgba(14,165,233,0.85)]" />
         </span>
       ))}
+
       {markers.map((m) => (
         <div key={m.id} className="absolute" style={{ left: m.x, top: m.y }}>
           <MarkerGlyph tool={m.tool} step={m.step} done={m.done} x={m.x} y={m.y} />
         </div>
       ))}
+
       {trail.map((p, i) => {
         const k = (i + 1) / trail.length;
         const head = i === trail.length - 1;
@@ -128,11 +157,11 @@ export function MarkerLayer({
             style={{
               left: p.x,
               top: p.y,
-              width: 6 + 12 * k,
-              height: 6 + 12 * k,
+              width: head ? 20 : 5 + 9 * k,
+              height: head ? 20 : 5 + 9 * k,
               transform: "translate(-50%, -50%)",
-              opacity: 0.15 + 0.85 * k,
-              boxShadow: head ? "0 0 0 3px #fff, 0 0 22px 8px rgba(255,107,26,.6)" : undefined,
+              opacity: head ? 1 : 0.25 + 0.65 * k,
+              boxShadow: head ? "0 0 0 4px #fff, 0 0 26px 9px rgba(255,100,20,.72)" : undefined,
             }}
           />
         );
@@ -196,15 +225,15 @@ export function GuideMarker({
 export function CaptionBubble({ from, text }: { from: string; text: string }) {
   return (
     <div
-      className="gp-rise pointer-events-none absolute inset-x-3 bottom-[76px] z-40 flex gap-3 rounded-2xl bg-ink-900/95 p-3.5 text-white shadow-2xl ring-1 ring-white/10"
+      className="gp-rise pointer-events-none absolute inset-x-3 bottom-[76px] z-40 flex gap-3 rounded-2xl bg-slate-900/95 p-3.5 text-white shadow-2xl ring-1 ring-white/15"
       role="status"
     >
-      <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-volt text-[14px] font-semibold">
+      <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-volt text-[14px] font-bold">
         {from[0]}
       </span>
       <div>
-        <div className="text-[11px] font-medium uppercase tracking-wide text-slate-400">{from}</div>
-        <p className="mt-0.5 text-[15px] leading-snug">{text}</p>
+        <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-300">{from}</div>
+        <p className="mt-0.5 text-[15px] font-medium leading-snug text-white">{text}</p>
       </div>
     </div>
   );

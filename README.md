@@ -2,15 +2,15 @@
 
 **Point the way. Never take over.**
 
-GetPointr is an interactive visual-guidance demo built for cross-device testing (phone + laptop) with zero remote-control risk. Helpers guide device owners using animated laser rings, directional arrows, live laser trails, and numbered step sequences—while balances, passwords, account numbers, and 2FA codes stay blurred on the helper's screen.
+GetPointr is an interactive visual-guidance demo built for cross-device testing (phone + laptop) with zero remote-control risk. Helpers guide device owners using animated laser rings, directional arrows, smooth replayable laser trails, and numbered step sequences, while balances, passwords, account numbers, preferences, and 2FA codes stay blurred on the helper's screen.
 
 ## Core Routes
 
 | Route | Purpose |
 | --- | --- |
-| `/` | Landing page — launch a phone demo, open a helper console with QR code, or join by 6-character code |
-| `/host/[room]` | Phone experience — Trusted Circle verification, Harbor Credit Union mock app, incoming visual pointers, and automatic 60-second guided demo when testing solo |
-| `/helper/[room]` | Helper desktop console — QR pairing screen, live view-only mirror, Ring / Arrow / Steps tools, drag-to-laser, quick captions, Privacy Shield toggle, and metadata-only session log |
+| `/` | Landing page: launch a phone demo, open a helper console with QR code, or join by 6-character code |
+| `/host/[room]` | Phone experience: Trusted Circle verification, Session Preferences popup (Mandatory Privacy Shield, Light/Dark mode, Text Size), Harbor Credit Union mock app, incoming visual pointers with Replay, and automatic 60-second guided demo |
+| `/helper/[room]` | Helper desktop console: QR pairing screen, live view-only mirror (auto-blurred while owner adjusts preferences), Ring / Arrow / Steps / Laser Replay tools, quick captions, Privacy Shield, and metadata-only session log |
 
 ## Local Development
 
@@ -26,7 +26,7 @@ Open `http://localhost:3000`.
 
 ## Environment Variables
 
-Copy `.env.example` to `.env.local` (and add the same variables in **Vercel → Settings → Environment Variables**):
+Copy `.env.example` to `.env.local` (and add the same variables in **Vercel -> Settings -> Environment Variables**):
 
 ```env
 NEXT_PUBLIC_SUPABASE_URL=https://<your-project-ref>.supabase.co

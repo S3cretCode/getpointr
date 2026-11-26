@@ -35,17 +35,19 @@ export type Marker = {
 
 export type Pt = { x: number; y: number };
 
-/** Everything that travels over the realtime channel. Metadata only — never pixels. */
+/** Everything that travels over the realtime channel. Metadata only, never pixels. */
 export type RoomEvent =
-  | { type: "markers"; markers: Marker[] } // helper → host (full list, idempotent)
-  | { type: "laser"; x: number; y: number } // helper → host (live drag)
-  | { type: "laser-end" }
-  | { type: "say"; id: string; text: string } // helper → host caption
-  | { type: "shield"; on: boolean } // helper → host
-  | { type: "state"; state: AppState } // host → helper (mirror sync)
-  | { type: "viewport"; h: number } // host → helper (logical height)
-  | { type: "tap"; x: number; y: number } // host → helper (where the owner tapped)
-  | { type: "done"; id: string } // host → helper (owner tapped a marker)
+  | { type: "markers"; markers: Marker[] } // helper -> host (full list, idempotent)
+  | { type: "laser"; x: number; y: number } // helper -> host (live drag point)
+  | { type: "laser-end"; path?: Pt[] } // helper -> host (completed laser gesture)
+  | { type: "say"; id: string; text: string } // helper -> host caption
+  | { type: "shield"; on: boolean } // helper -> host
+  | { type: "mandatory-shield"; locked: boolean } // host -> helper (locks helper shield on)
+  | { type: "prefs-open"; open: boolean } // host -> helper (blurs helper mirror while open)
+  | { type: "state"; state: AppState } // host -> helper (mirror sync)
+  | { type: "viewport"; h: number } // host -> helper (logical height)
+  | { type: "tap"; x: number; y: number } // host -> helper (where the owner tapped)
+  | { type: "done"; id: string } // host -> helper (owner tapped a marker)
   | { type: "sync" } // either side asks the other to resend its data
   | { type: "end" };
 

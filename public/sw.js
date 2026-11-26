@@ -1,4 +1,4 @@
-// GetPointr service worker — keeps the app installable and shows an offline page.
+// GetPointr service worker: keeps the app installable and shows an offline page.
 // Realtime sessions always need the network, so pages are network-first.
 const VERSION = "gp-v1";
 const OFFLINE_URL = "/offline.html";

@@ -14,12 +14,15 @@ import {
   Eye,
   EyeOff,
   Hash,
+  Lock,
   MessageSquareText,
   MousePointer2,
   Radio,
+  RotateCcw,
   ScrollText,
   Send,
   ShieldCheck,
+  SlidersHorizontal,
   Smartphone,
   Trash2,
   Undo2,
@@ -28,6 +31,7 @@ import MockBankApp, { ShieldContext } from "./MockBankApp";
 import { Stage, W, FRAME_PAD, IPHONE_CHROME_H } from "./Stage";
 import { MarkerLayer, type TapRipple } from "./Markers";
 import { Logo } from "./Logo";
+import { AppearanceBar } from "@/lib/preferences";
 import { useRoom, type SendFn } from "@/lib/room";
 import { fingerprint } from "@/lib/ids";
 import { formatClock, useElementSize, useOrigin } from "@/lib/hooks";
@@ -49,10 +53,10 @@ const TOOLS: { id: Tool; label: string; icon: typeof Circle; key: string }[] = [
 ];
 
 const QUICK = [
-  "Tap where I'm pointing",
+  "Tap where I am pointing",
   "Go back one screen",
-  "You're doing great!",
-  "Never share that code with anyone — including me.",
+  "You are doing great!",
+  "Never share that code with anyone, including me.",
 ];
 
 type LogEntry = { id: number; t: number; text: string };
@@ -70,7 +74,12 @@ export default function HelperView({ room }: { room: string }) {
   const [tool, setTool] = useState<Tool>("ring");
   const [shield, setShield] = useState(true);
   const shieldRef = useRef(true);
+  const [mandatoryShield, setMandatoryShield] = useState(true);
+  const mandatoryShieldRef = useRef(true);
+  const [hostPrefsOpen, setHostPrefsOpen] = useState(false);
+
   const [trail, setTrail] = useState<Pt[]>([]);
+  const [lastLaserPath, setLastLaserPath] = useState<Pt[]>([]);
   const [taps, setTaps] = useState<TapRipple[]>([]);
   const [log, setLog] = useState<LogEntry[]>([]);
   const logId = useRef(0);
@@ -83,14 +92,14 @@ export default function HelperView({ room }: { room: string }) {
   const [everConnected, setEverConnected] = useState(false);
 
   const stageRef = useRef<HTMLDivElement>(null);
-  const press = useRef<{ x: number; y: number; drag: boolean; last: number } | null>(null);
+  const press = useRef<{ x: number; y: number; drag: boolean; last: number; path: Pt[] } | null>(null);
   const [mainRef, size] = useElementSize<HTMLDivElement>();
 
   const scale =
     size.w > 0
       ? Math.max(
           0.3,
-          Math.min((size.w - 48 - FRAME_PAD * 2) / W, (size.h - 96 - FRAME_PAD * 2) / (hostH + IPHONE_CHROME_H), 1.1),
+          Math.min((size.w - 48 - FRAME_PAD * 2) / W, (size.h - 96 - FRAME_PAD * 2) / (hostH + IPHONE_CHROME_H), 1.08),
         )
       : 1;
 
@@ -121,18 +130,37 @@ export default function HelperView({ room }: { room: string }) {
       case "viewport":
         setHostH(e.h);
         break;
+      case "prefs-open":
+        setHostPrefsOpen(e.open);
+        if (e.open) addLog(`${OWNER_NAME} opened session preferences (screen blurred)`);
+        break;
+      case "mandatory-shield":
+        mandatoryShieldRef.current = e.locked;
+        setMandatoryShield(e.locked);
+        if (e.locked && !shieldRef.current) {
+          shieldRef.current = true;
+          setShield(true);
+          emit({ type: "shield", on: true });
+          addLog(`Privacy Shield locked ON by ${OWNER_NAME}`);
+        }
+        break;
       case "tap": {
         const id = nanoid(6);
-        setTaps((t) => [...t.slice(-4), { id, x: e.x, y: e.y }]);
-        setTimeout(() => setTaps((t) => t.filter((r) => r.id !== id)), 900);
+        setTaps((t) => [...t.slice(-5), { id, x: e.x, y: e.y }]);
+        setTimeout(() => setTaps((t) => t.filter((r) => r.id !== id)), 1350);
         break;
       }
       case "done": {
         const hit = markersRef.current.find((m) => m.id === e.id);
         if (!hit || hit.done) break;
         addLog(`${OWNER_NAME} tapped the highlighted spot ✓`);
-        syncMarkers(markersRef.current.map((m) => (m.id === e.id ? { ...m, done: true } : m)), emit);
-        if (hit.tool !== "step") setTimeout(() => syncMarkers(markersRef.current.filter((m) => m.id !== e.id), emit), 1200);
+        syncMarkers(
+          markersRef.current.map((m) => (m.id === e.id ? { ...m, done: true } : m)),
+          emit,
+        );
+        if (hit.tool !== "step") {
+          setTimeout(() => syncMarkers(markersRef.current.filter((m) => m.id !== e.id), emit), 1200);
+        }
         break;
       }
       case "sync":
@@ -156,6 +184,7 @@ export default function HelperView({ room }: { room: string }) {
       emit({ type: "shield", on: shieldRef.current });
       emit({ type: "sync" });
     } else {
+      setHostPrefsOpen(false);
       addLog("Phone disconnected");
     }
   };
@@ -176,7 +205,6 @@ export default function HelperView({ room }: { room: string }) {
     return () => clearInterval(iv);
   }, []);
 
-  // ---- Pointer input on the mirrored screen ------------------------------
   const toLogical = (ev: ReactPointerEvent) => {
     const r = stageRef.current!.getBoundingClientRect();
     return {
@@ -200,20 +228,22 @@ export default function HelperView({ room }: { room: string }) {
   };
 
   const onPointerDown = (ev: ReactPointerEvent<HTMLDivElement>) => {
+    if (hostPrefsOpen) return;
     ev.currentTarget.setPointerCapture(ev.pointerId);
     const p = toLogical(ev);
-    press.current = { ...p, drag: false, last: 0 };
+    press.current = { ...p, drag: false, last: 0, path: [p] };
   };
   const onPointerMove = (ev: ReactPointerEvent<HTMLDivElement>) => {
     const pr = press.current;
-    if (!pr) return;
+    if (!pr || hostPrefsOpen) return;
     const p = toLogical(ev);
     if (!pr.drag && Math.hypot(p.x - pr.x, p.y - pr.y) > 8) pr.drag = true;
     if (!pr.drag) return;
-    setTrail((t) => [...t.slice(-9), p]);
+    setTrail((t) => [...t.slice(-13), p]);
     const t = performance.now();
-    if (t - pr.last > 45) {
+    if (t - pr.last > 60) {
       pr.last = t;
+      pr.path.push(p);
       send({ type: "laser", x: p.x, y: p.y });
     }
   };
@@ -222,11 +252,30 @@ export default function HelperView({ room }: { room: string }) {
     press.current = null;
     if (!pr) return;
     if (pr.drag) {
-      send({ type: "laser-end" });
-      setTimeout(() => setTrail([]), 250);
+      const saved = pr.path.slice(-40);
+      setLastLaserPath(saved);
+      send({ type: "laser-end", path: saved });
+      addLog(`Live laser gesture sent (${saved.length} points)`);
+      setTimeout(() => setTrail([]), 900);
     } else {
       placeMarker(pr.x, pr.y);
     }
+  };
+
+  const replayLaser = () => {
+    if (!lastLaserPath.length || !peer) return;
+    setTrail([]);
+    lastLaserPath.forEach((pt, idx) => {
+      setTimeout(() => {
+        setTrail((prev) => [...prev.slice(-13), pt]);
+        send({ type: "laser", x: pt.x, y: pt.y });
+        if (idx === lastLaserPath.length - 1) {
+          send({ type: "laser-end", path: lastLaserPath });
+          setTimeout(() => setTrail([]), 1000);
+        }
+      }, idx * 70);
+    });
+    addLog("Replayed last laser gesture");
   };
 
   const undo = () => {
@@ -240,6 +289,7 @@ export default function HelperView({ room }: { room: string }) {
     addLog("Cleared all pointers");
   };
   const toggleShield = () => {
+    if (mandatoryShieldRef.current) return;
     const next = !shieldRef.current;
     shieldRef.current = next;
     setShield(next);
@@ -258,10 +308,9 @@ export default function HelperView({ room }: { room: string }) {
     addLog("You ended the session");
   };
 
-  // Keyboard shortcuts (latest handlers via ref)
-  const keyActions = useRef({ undo, clear, toggleShield });
+  const keyActions = useRef({ undo, clear, toggleShield, replayLaser });
   useEffect(() => {
-    keyActions.current = { undo, clear, toggleShield };
+    keyActions.current = { undo, clear, toggleShield, replayLaser };
   });
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -272,6 +321,7 @@ export default function HelperView({ room }: { room: string }) {
       else if (k === "3") setTool("step");
       else if (k === "z") keyActions.current.undo();
       else if (k === "c") keyActions.current.clear();
+      else if (k === "r") keyActions.current.replayLaser();
       else if (k === "s") keyActions.current.toggleShield();
     };
     window.addEventListener("keydown", onKey);
@@ -289,31 +339,35 @@ export default function HelperView({ room }: { room: string }) {
   };
 
   const elapsed = peer && connectedAt && now ? now - connectedAt : 0;
+  const effectiveShield = mandatoryShield || shield;
 
   return (
-    <div className="flex min-h-dvh flex-col bg-ink-950 text-white lg:h-dvh">
+    <div className="flex min-h-dvh flex-col bg-gp-bg text-gp-text lg:h-dvh">
       {/* Top bar */}
-      <header className="flex h-14 shrink-0 items-center gap-3 border-b border-white/10 bg-ink-900 px-4 sm:px-5">
+      <header className="flex min-h-14 shrink-0 flex-wrap items-center gap-3 border-b border-gp-border bg-gp-surface px-4 py-2 sm:px-5">
         <Link href="/" aria-label="GetPointr home">
-          <Logo size={26} />
+          <Logo size={28} />
         </Link>
-        <span className="hidden rounded-full bg-white/5 px-2.5 py-1 font-mono text-[12px] tracking-widest text-slate-300 ring-1 ring-white/10 sm:inline">
+        <span className="hidden rounded-full border border-gp-border bg-gp-card px-2.5 py-1 font-mono text-[12px] font-bold tracking-widest text-gp-sub sm:inline">
           {room}
         </span>
         <span
-          className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[12px] font-medium ${
-            peer ? "bg-emerald-500/15 text-emerald-300" : "bg-white/10 text-slate-300"
+          className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[12px] font-bold ${
+            peer
+              ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-300"
+              : "border border-gp-border bg-gp-card text-gp-sub"
           }`}
         >
-          <span className={`h-2 w-2 rounded-full ${peer ? "bg-emerald-400" : "gp-pulse-dot bg-amber-400"}`} />
+          <span className={`h-2 w-2 rounded-full ${peer ? "bg-emerald-500" : "gp-pulse-dot bg-amber-500"}`} />
           {peer ? "Phone connected" : status === "error" ? "Connection error" : "Waiting for phone"}
         </span>
-        <div className="ml-auto flex items-center gap-3">
-          {peer && <span className="hidden font-mono text-[13px] text-slate-400 sm:inline">{formatClock(elapsed)}</span>}
+        <div className="ml-auto flex items-center gap-2.5">
+          <AppearanceBar compact />
+          {peer && <span className="hidden font-mono text-[13px] font-semibold text-gp-muted sm:inline">{formatClock(elapsed)}</span>}
           <button
             type="button"
             onClick={endSession}
-            className="h-9 cursor-pointer rounded-lg bg-white/10 px-3 text-[13px] font-semibold transition-colors hover:bg-rose-500/80"
+            className="h-9 cursor-pointer rounded-lg border border-gp-border bg-gp-card px-3 text-[13px] font-bold text-gp-text transition-colors hover:border-rose-500 hover:bg-rose-500 hover:text-white"
           >
             End session
           </button>
@@ -325,18 +379,37 @@ export default function HelperView({ room }: { room: string }) {
         <main ref={mainRef} className="relative flex min-h-[620px] flex-1 flex-col items-center justify-center p-6 lg:min-h-0">
           {peer ? (
             <>
-              <div className="mb-3 flex items-center gap-2 text-[13px] text-slate-400">
-                <Eye className="h-4 w-4" />
-                Live view of {OWNER_NAME}&apos;s phone · <span className="text-slate-200">{SCREEN_LABEL[hostState.screen]}</span>
-                <span className="rounded-full bg-white/5 px-2 py-0.5 text-[11px] ring-1 ring-white/10">view only</span>
+              <div className="mb-3 flex flex-wrap items-center justify-center gap-2 text-[0.86rem] font-semibold text-gp-sub">
+                <Eye className="h-4 w-4 text-laser" />
+                Live view of {OWNER_NAME}&apos;s phone ·{" "}
+                <span className="font-bold text-gp-text">{SCREEN_LABEL[hostState.screen]}</span>
+                <span className="rounded-full border border-gp-border bg-gp-card px-2.5 py-0.5 text-[11px] font-bold">
+                  View-only (point, never tap)
+                </span>
               </div>
               <Stage height={hostH} scale={scale} innerRef={stageRef} framed>
-                <ShieldContext.Provider value={shield}>
+                <ShieldContext.Provider value={effectiveShield}>
                   <MockBankApp state={hostState} />
                 </ShieldContext.Provider>
                 <MarkerLayer markers={markers} trail={trail} taps={taps} />
+
+                {/* Automatic blur veil when phone owner has Session Preferences open */}
+                {hostPrefsOpen && (
+                  <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-slate-950/75 px-8 text-center text-white backdrop-blur-xl">
+                    <span className="grid h-14 w-14 place-items-center rounded-2xl bg-laser/20 text-laser ring-1 ring-white/20">
+                      <SlidersHorizontal className="h-7 w-7" />
+                    </span>
+                    <h3 className="mt-4 text-[18px] font-extrabold tracking-tight">
+                      {OWNER_NAME} is setting session preferences
+                    </h3>
+                    <p className="mt-1.5 text-[13px] font-medium leading-relaxed text-slate-200">
+                      Screen is automatically blurred while {OWNER_NAME} selects privacy and accessibility options.
+                    </p>
+                  </div>
+                )}
+
                 <div
-                  className="absolute inset-0 z-40 cursor-crosshair"
+                  className={`absolute inset-0 z-40 ${hostPrefsOpen ? "cursor-not-allowed" : "cursor-crosshair"}`}
                   style={{ touchAction: "none" }}
                   onPointerDown={onPointerDown}
                   onPointerMove={onPointerMove}
@@ -345,8 +418,8 @@ export default function HelperView({ room }: { room: string }) {
                   aria-label="Click to point, drag for a live laser"
                 />
               </Stage>
-              <p className="mt-3 text-[12px] text-slate-500">
-                Click to drop a pointer · drag for a live laser · blue ripples show where {OWNER_NAME} taps
+              <p className="mt-3 text-center text-[0.8rem] font-medium text-gp-muted">
+                Click to place a pointer · drag for a live laser · bright blue ripples show where {OWNER_NAME} taps
               </p>
             </>
           ) : (
@@ -363,25 +436,33 @@ export default function HelperView({ room }: { room: string }) {
         </main>
 
         {/* Control panel */}
-        <aside className="w-full shrink-0 space-y-4 overflow-y-auto border-t border-white/10 bg-ink-900/60 p-4 sm:p-5 lg:w-[360px] lg:border-l lg:border-t-0">
+        <aside className="w-full shrink-0 space-y-4 overflow-y-auto border-t border-gp-border bg-gp-surface/75 p-4 sm:p-5 lg:w-[376px] lg:border-l lg:border-t-0">
           <Card>
             <div className="flex items-center gap-2">
-              <ShieldCheck className={`h-5 w-5 ${peer ? "text-emerald-400" : "text-slate-500"}`} />
-              <h2 className="text-[14px] font-semibold">{peer ? "Trusted Circle verified" : "Awaiting paired device"}</h2>
+              <ShieldCheck className={`h-5 w-5 ${peer ? "text-emerald-500" : "text-gp-muted"}`} />
+              <h2 className="text-[0.92rem] font-bold text-gp-text">
+                {peer ? "Trusted Circle verified" : "Awaiting paired device"}
+              </h2>
             </div>
-            <div className="mt-2 font-mono text-[11px] tracking-wide text-slate-400">Pairing fingerprint {fp || "…"}</div>
-            <ul className="mt-3 space-y-1.5 text-[13px] text-slate-300">
-              <li className="flex items-center gap-2"><Ban className="h-4 w-4 text-laser" /> Remote control: disabled by design</li>
-              <li className="flex items-center gap-2"><Database className="h-4 w-4 text-laser" /> Screen data stored: none</li>
+            <div className="mt-2 font-mono text-[11px] font-semibold tracking-wide text-gp-muted">
+              Pairing fingerprint {fp || "..."}
+            </div>
+            <ul className="mt-3 space-y-1.5 text-[0.84rem] font-medium text-gp-sub">
               <li className="flex items-center gap-2">
-                <Radio className="h-4 w-4 text-laser" />
+                <Ban className="h-4 w-4 shrink-0 text-laser" /> Remote taps disabled (visual pointers only)
+              </li>
+              <li className="flex items-center gap-2">
+                <Database className="h-4 w-4 shrink-0 text-laser" /> Screen data stored: none
+              </li>
+              <li className="flex items-center gap-2">
+                <Radio className="h-4 w-4 shrink-0 text-laser" />
                 {mode === "supabase" ? "Realtime: encrypted (TLS) · metadata only" : "Local demo channel (same browser)"}
               </li>
             </ul>
           </Card>
 
           <Card>
-            <SectionTitle>Pointer</SectionTitle>
+            <SectionTitle>Pointer tools</SectionTitle>
             <div className="mt-2 grid grid-cols-3 gap-2" role="radiogroup" aria-label="Pointer tool">
               {TOOLS.map(({ id, label, icon: Icon, key }) => (
                 <button
@@ -390,19 +471,28 @@ export default function HelperView({ room }: { room: string }) {
                   role="radio"
                   aria-checked={tool === id}
                   onClick={() => setTool(id)}
-                  className={`relative flex h-16 cursor-pointer flex-col items-center justify-center gap-1 rounded-xl text-[12px] font-semibold ring-1 transition-colors ${
-                    tool === id ? "bg-laser/15 text-orange-200 ring-laser" : "bg-white/5 text-slate-300 ring-white/10 hover:bg-white/10"
+                  className={`relative flex h-16 cursor-pointer flex-col items-center justify-center gap-1 rounded-xl border text-[12px] font-bold transition-colors ${
+                    tool === id
+                      ? "border-laser bg-laser/15 text-gp-text"
+                      : "border-gp-border bg-gp-elevated text-gp-sub hover:bg-gp-hover"
                   }`}
                 >
                   <Icon className="h-5 w-5" />
                   {label}
-                  <kbd className="absolute right-1.5 top-1 font-mono text-[10px] text-slate-500">{key}</kbd>
+                  <kbd className="absolute right-1.5 top-1 font-mono text-[10px] font-semibold text-gp-muted">{key}</kbd>
                 </button>
               ))}
             </div>
-            <div className="mt-2 grid grid-cols-2 gap-2">
+            <div className="mt-2 grid grid-cols-3 gap-2">
               <SmallBtn onClick={undo} icon={Undo2} label="Undo" kbd="Z" />
               <SmallBtn onClick={clear} icon={Trash2} label="Clear" kbd="C" />
+              <SmallBtn
+                onClick={replayLaser}
+                icon={RotateCcw}
+                label="Replay"
+                kbd="R"
+                disabled={!lastLaserPath.length || !peer}
+              />
             </div>
           </Card>
 
@@ -415,34 +505,36 @@ export default function HelperView({ room }: { room: string }) {
                   type="button"
                   onClick={() => say(q)}
                   disabled={!peer}
-                  className="cursor-pointer rounded-full bg-white/5 px-3 py-1.5 text-left text-[12px] text-slate-200 ring-1 ring-white/10 transition-colors hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-40"
+                  className="cursor-pointer rounded-full border border-gp-border bg-gp-elevated px-3 py-1.5 text-left text-[12px] font-semibold text-gp-sub transition-colors hover:bg-gp-hover hover:text-gp-text disabled:cursor-not-allowed disabled:opacity-45"
                 >
                   {q}
                 </button>
               ))}
             </div>
             <form
-              className="mt-2 flex gap-2"
+              className="mt-2.5 flex gap-2"
               onSubmit={(e) => {
                 e.preventDefault();
                 say(msg);
                 setMsg("");
               }}
             >
-              <label htmlFor="say" className="sr-only">Message to phone</label>
+              <label htmlFor="say" className="sr-only">
+                Message to phone
+              </label>
               <input
                 id="say"
                 value={msg}
                 onChange={(e) => setMsg(e.target.value)}
                 maxLength={140}
-                placeholder="Type a short instruction…"
-                className="h-10 min-w-0 flex-1 rounded-lg bg-ink-950 px-3 text-[14px] text-white ring-1 ring-white/10 placeholder:text-slate-500 focus:outline-none focus:ring-laser"
+                placeholder="Type a short instruction..."
+                className="h-10 min-w-0 flex-1 rounded-lg border border-gp-border bg-gp-bg px-3 text-[14px] font-medium text-gp-text placeholder:text-gp-muted focus:outline-none focus:ring-2 focus:ring-laser"
               />
               <button
                 type="submit"
                 disabled={!peer || !msg.trim()}
                 aria-label="Send message"
-                className="grid h-10 w-10 cursor-pointer place-items-center rounded-lg bg-volt transition-colors hover:bg-violet-500 disabled:cursor-not-allowed disabled:opacity-40"
+                className="grid h-10 w-10 cursor-pointer place-items-center rounded-lg bg-volt text-white transition-colors hover:bg-violet-600 disabled:cursor-not-allowed disabled:opacity-40"
               >
                 <Send className="h-4 w-4" />
               </button>
@@ -452,25 +544,46 @@ export default function HelperView({ room }: { room: string }) {
           <Card>
             <div className="flex items-start gap-3">
               <div className="flex-1">
-                <div className="flex items-center gap-2 text-[14px] font-semibold">
-                  {shield ? <EyeOff className="h-4 w-4 text-emerald-400" /> : <Eye className="h-4 w-4 text-amber-400" />}
+                <div className="flex flex-wrap items-center gap-2 text-[0.92rem] font-bold text-gp-text">
+                  {effectiveShield ? (
+                    <EyeOff className="h-4 w-4 text-emerald-500" />
+                  ) : (
+                    <Eye className="h-4 w-4 text-amber-500" />
+                  )}
                   Privacy Shield
-                  <kbd className="font-mono text-[10px] text-slate-500">S</kbd>
+                  {!mandatoryShield && <kbd className="font-mono text-[10px] text-gp-muted">S</kbd>}
                 </div>
-                <p className="mt-1 text-[12px] leading-relaxed text-slate-400">
-                  Balances, account numbers, passwords and 2FA codes are masked on the phone before anything is
-                  shared. Toggle off only to show judges the difference.
+                {mandatoryShield ? (
+                  <p className="mt-1 flex items-center gap-1.5 text-[12px] font-bold text-emerald-600 dark:text-emerald-400">
+                    <Lock className="h-3.5 w-3.5 shrink-0" /> Locked ON by {OWNER_NAME} (Mandatory)
+                  </p>
+                ) : null}
+                <p className="mt-1 text-[12px] font-medium leading-relaxed text-gp-sub">
+                  Balances, account numbers, passwords, preferences, and 2FA codes stay masked on your screen.
+                  {mandatoryShield
+                    ? ` ${OWNER_NAME} enabled Mandatory Privacy Shield for this session.`
+                    : " Toggle off only to show judges the difference."}
                 </p>
               </div>
               <button
                 type="button"
                 role="switch"
-                aria-checked={shield}
+                aria-checked={effectiveShield}
                 aria-label="Privacy Shield"
+                disabled={mandatoryShield}
                 onClick={toggleShield}
-                className={`relative mt-0.5 h-7 w-12 shrink-0 cursor-pointer rounded-full transition-colors duration-200 ${shield ? "bg-emerald-500" : "bg-white/20"}`}
+                title={mandatoryShield ? `Locked ON by ${OWNER_NAME}` : "Toggle Privacy Shield"}
+                className={`relative mt-0.5 h-7 w-12 shrink-0 rounded-full transition-colors duration-200 ${
+                  effectiveShield ? "bg-emerald-500" : "bg-slate-400"
+                } ${mandatoryShield ? "cursor-not-allowed opacity-80" : "cursor-pointer"}`}
               >
-                <span className={`absolute left-0 top-0.5 h-6 w-6 rounded-full bg-white shadow transition-transform duration-200 ${shield ? "translate-x-[22px]" : "translate-x-0.5"}`} />
+                <span
+                  className={`absolute left-0 top-0.5 grid h-6 w-6 place-items-center rounded-full bg-white text-emerald-700 shadow transition-transform duration-200 ${
+                    effectiveShield ? "translate-x-[22px]" : "translate-x-0.5"
+                  }`}
+                >
+                  {mandatoryShield ? <Lock className="h-3 w-3" /> : null}
+                </span>
               </button>
             </div>
           </Card>
@@ -478,13 +591,17 @@ export default function HelperView({ room }: { room: string }) {
           <Card>
             <SectionTitle icon={ScrollText}>Session log · metadata only</SectionTitle>
             <ol className="mt-2 max-h-56 space-y-1.5 overflow-y-auto pr-1 text-[12px]">
-              {log.length === 0 && <li className="text-slate-500">Events will appear here. No screen content is ever recorded.</li>}
+              {log.length === 0 && (
+                <li className="font-medium text-gp-muted">
+                  Events will appear here. No screen content is ever recorded.
+                </li>
+              )}
               {log.map((l) => (
                 <li key={l.id} className="flex gap-2">
-                  <span className="shrink-0 font-mono text-slate-500">
+                  <span className="shrink-0 font-mono font-semibold text-gp-muted">
                     {new Date(l.t).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
                   </span>
-                  <span className="text-slate-300">{l.text}</span>
+                  <span className="font-medium text-gp-sub">{l.text}</span>
                 </li>
               ))}
             </ol>
@@ -493,22 +610,32 @@ export default function HelperView({ room }: { room: string }) {
       </div>
 
       {ended && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink-950/90 p-6 backdrop-blur">
-          <div className="w-full max-w-sm rounded-3xl bg-ink-900 p-6 text-center ring-1 ring-white/10">
-            <span className="mx-auto grid h-14 w-14 place-items-center rounded-full bg-emerald-500/15 text-emerald-400">
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-6 backdrop-blur"
+          style={{ background: "var(--gp-backdrop)" }}
+        >
+          <div className="w-full max-w-sm rounded-3xl border border-gp-border bg-gp-surface p-6 text-center shadow-2xl">
+            <span className="mx-auto grid h-14 w-14 place-items-center rounded-full bg-emerald-500/15 text-emerald-500">
               <ShieldCheck className="h-7 w-7" />
             </span>
-            <h2 className="mt-4 text-[20px] font-semibold">
+            <h2 className="mt-4 text-[1.25rem] font-extrabold text-gp-text">
               {ended === "you" ? "Session ended" : `${OWNER_NAME} ended the session`}
             </h2>
-            <p className="mt-1 text-[14px] text-slate-400">
+            <p className="mt-1 text-[0.9rem] font-medium text-gp-sub">
               You never had control of the device. Nothing from the screen was stored.
             </p>
             <div className="mt-5 grid gap-2">
-              <Link href="/" className="inline-flex h-11 items-center justify-center rounded-xl bg-laser text-[14px] font-semibold transition-colors hover:bg-orange-500">
+              <Link
+                href="/"
+                className="inline-flex h-11 items-center justify-center rounded-xl bg-laser text-[14px] font-bold text-white transition-colors hover:bg-orange-600"
+              >
                 Start a new session
               </Link>
-              <button type="button" onClick={() => setEnded(null)} className="h-11 cursor-pointer rounded-xl bg-white/10 text-[14px] font-semibold transition-colors hover:bg-white/15">
+              <button
+                type="button"
+                onClick={() => setEnded(null)}
+                className="h-11 cursor-pointer rounded-xl border border-gp-border bg-gp-elevated text-[14px] font-bold text-gp-text transition-colors hover:bg-gp-hover"
+              >
                 Back to console
               </button>
             </div>
@@ -538,7 +665,7 @@ function WaitingPanel({
 }) {
   return (
     <div className="flex w-full max-w-3xl flex-col items-center gap-8 md:flex-row md:items-center">
-      <div className="rounded-3xl bg-white p-5 shadow-2xl shadow-laser/10">
+      <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-2xl shadow-laser/10">
         {phoneUrl ? (
           <QRCodeSVG value={phoneUrl} size={232} level="M" marginSize={0} fgColor="#0B1120" />
         ) : (
@@ -546,37 +673,48 @@ function WaitingPanel({
         )}
       </div>
       <div className="flex-1 text-center md:text-left">
-        <div className="inline-flex items-center gap-2 rounded-full bg-laser/15 px-3 py-1 text-[12px] font-semibold text-orange-300">
-          <Smartphone className="h-3.5 w-3.5" /> {reconnecting ? "Phone disconnected — waiting to reconnect" : "Step 1 of 2"}
+        <div className="inline-flex items-center gap-2 rounded-full bg-laser/15 px-3 py-1 text-[12px] font-bold text-laser">
+          <Smartphone className="h-3.5 w-3.5" />{" "}
+          {reconnecting ? "Phone disconnected: waiting to reconnect" : "Step 1 of 2"}
         </div>
-        <h1 className="mt-3 text-[30px] font-semibold leading-tight tracking-tight">Scan with the phone you want to help</h1>
-        <ol className="mt-4 space-y-2 text-[15px] text-slate-300">
-          <li>1. Open the phone&apos;s camera and point it at the code.</li>
-          <li>2. The phone verifies your Trusted Circle pairing.</li>
-          <li>3. You&apos;ll see its screen here — and can point, never tap.</li>
+        <h1 className="mt-3 text-[1.9rem] font-extrabold leading-tight tracking-tight text-gp-text">
+          Scan with the phone you want to help
+        </h1>
+        <ol className="mt-4 space-y-2 text-[0.96rem] font-medium text-gp-sub">
+          <li>1. Open the phone camera and point it at the QR code.</li>
+          <li>2. The phone verifies your Trusted Circle pairing and preferences.</li>
+          <li>3. You will see its screen here and can point, never tap.</li>
         </ol>
+
         <div className="mt-5 flex flex-wrap items-center justify-center gap-3 md:justify-start">
-          <div className="rounded-xl bg-ink-800 px-4 py-2 ring-1 ring-white/10">
-            <div className="text-[10px] uppercase tracking-wider text-slate-400">Or enter code</div>
-            <div className="font-mono text-[22px] font-semibold tracking-[0.3em]">{room}</div>
-          </div>
-          <button type="button" onClick={onCopy} className="inline-flex h-11 cursor-pointer items-center gap-2 rounded-xl bg-white/10 px-4 text-[14px] font-semibold transition-colors hover:bg-white/15">
-            {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />} {copied ? "Copied" : "Copy phone link"}
-          </button>
           <a
             href={phoneUrl || "#"}
             target="_blank"
             rel="noreferrer"
-            className="inline-flex h-11 items-center gap-1.5 rounded-xl px-3 text-[14px] font-medium text-slate-300 transition-colors hover:bg-white/5 hover:text-white"
+            className="inline-flex h-12 items-center gap-2 rounded-xl bg-laser px-5 text-[0.96rem] font-extrabold text-white shadow-lg shadow-laser/30 transition-colors hover:bg-orange-600"
           >
-            Open phone view in a new tab <ArrowUpRight className="h-4 w-4" />
+            Open phone view in a new tab <ArrowUpRight className="h-5 w-5 stroke-[2.6]" />
           </a>
+
+          <button
+            type="button"
+            onClick={onCopy}
+            className="inline-flex h-12 cursor-pointer items-center gap-2 rounded-xl border border-gp-border bg-gp-card px-4 text-[0.92rem] font-bold text-gp-text transition-colors hover:bg-gp-hover"
+          >
+            {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />} {copied ? "Copied" : "Copy phone link"}
+          </button>
+
+          <div className="rounded-xl border border-gp-border bg-gp-card px-4 py-1.5">
+            <div className="text-[10px] font-bold uppercase tracking-wider text-gp-muted">Session code</div>
+            <div className="font-mono text-[20px] font-bold tracking-[0.28em] text-gp-text">{room}</div>
+          </div>
         </div>
+
         {(isLocalhost || mode === "local") && (
-          <p className="mt-4 rounded-xl bg-amber-500/10 p-3 text-[12px] leading-relaxed text-amber-200 ring-1 ring-amber-500/20">
+          <p className="mt-4 rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-[12px] font-medium leading-relaxed text-gp-sub">
             {mode === "local"
-              ? "Realtime isn't configured yet, so only tabs in this browser can connect. Use “Open phone view in a new tab” to test."
-              : "You're on localhost — a phone can't reach this address. Use the deployed URL for phone testing."}
+              ? "Realtime is running in local browser mode right now. Click “Open phone view in a new tab” above to test side by side."
+              : "You are on localhost, which a separate phone cannot reach yet. Use the deployed Vercel URL for cross-device phone testing."}
           </p>
         )}
       </div>
@@ -585,26 +723,45 @@ function WaitingPanel({
 }
 
 function Card({ children }: { children: React.ReactNode }) {
-  return <section className="rounded-2xl bg-ink-800/80 p-4 ring-1 ring-white/10">{children}</section>;
+  return <section className="rounded-2xl border border-gp-border bg-gp-card p-4 shadow-xs">{children}</section>;
 }
 
-function SectionTitle({ children, icon: Icon = MessageSquareText }: { children: React.ReactNode; icon?: typeof Circle }) {
+function SectionTitle({
+  children,
+  icon: Icon = MessageSquareText,
+}: {
+  children: React.ReactNode;
+  icon?: typeof Circle;
+}) {
   return (
-    <h2 className="flex items-center gap-2 text-[12px] font-semibold uppercase tracking-wider text-slate-400">
+    <h2 className="flex items-center gap-2 text-[12px] font-bold uppercase tracking-wider text-gp-muted">
       <Icon className="h-3.5 w-3.5" />
       {children}
     </h2>
   );
 }
 
-function SmallBtn({ onClick, icon: Icon, label, kbd }: { onClick: () => void; icon: typeof Circle; label: string; kbd: string }) {
+function SmallBtn({
+  onClick,
+  icon: Icon,
+  label,
+  kbd,
+  disabled,
+}: {
+  onClick: () => void;
+  icon: typeof Circle;
+  label: string;
+  kbd: string;
+  disabled?: boolean;
+}) {
   return (
     <button
       type="button"
       onClick={onClick}
-      className="flex h-10 cursor-pointer items-center justify-center gap-2 rounded-lg bg-white/5 text-[13px] font-medium text-slate-200 ring-1 ring-white/10 transition-colors hover:bg-white/10"
+      disabled={disabled}
+      className="flex h-10 cursor-pointer items-center justify-center gap-1.5 rounded-lg border border-gp-border bg-gp-elevated px-2 text-[12px] font-bold text-gp-sub transition-colors hover:bg-gp-hover hover:text-gp-text disabled:cursor-not-allowed disabled:opacity-45"
     >
-      <Icon className="h-4 w-4" /> {label} <kbd className="font-mono text-[10px] text-slate-500">{kbd}</kbd>
+      <Icon className="h-3.5 w-3.5" /> {label} <kbd className="font-mono text-[10px] text-gp-muted">{kbd}</kbd>
     </button>
   );
 }
