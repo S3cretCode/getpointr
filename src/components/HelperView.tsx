@@ -14,6 +14,7 @@ import {
   Eye,
   EyeOff,
   Hash,
+  HelpCircle,
   Lock,
   MessageSquareText,
   MousePointer2,
@@ -26,6 +27,7 @@ import {
   Smartphone,
   Trash2,
   Undo2,
+  X,
 } from "lucide-react";
 import MockBankApp, { ShieldContext } from "./MockBankApp";
 import { Stage, W, FRAME_PAD, IPHONE_CHROME_H } from "./Stage";
@@ -77,6 +79,7 @@ export default function HelperView({ room }: { room: string }) {
   const [mandatoryShield, setMandatoryShield] = useState(true);
   const mandatoryShieldRef = useRef(true);
   const [hostPrefsOpen, setHostPrefsOpen] = useState(false);
+  const [activeRequest, setActiveRequest] = useState<{ id: string; text: string } | null>(null);
 
   const [trail, setTrail] = useState<Pt[]>([]);
   const [lastLaserPath, setLastLaserPath] = useState<Pt[]>([]);
@@ -99,7 +102,7 @@ export default function HelperView({ room }: { room: string }) {
     size.w > 0
       ? Math.max(
           0.3,
-          Math.min((size.w - 48 - FRAME_PAD * 2) / W, (size.h - 96 - FRAME_PAD * 2) / (hostH + IPHONE_CHROME_H), 1.08),
+          Math.min((size.w - 48 - FRAME_PAD * 2) / W, (size.h - 110 - FRAME_PAD * 2) / (hostH + IPHONE_CHROME_H), 1.06),
         )
       : 1;
 
@@ -143,6 +146,10 @@ export default function HelperView({ room }: { room: string }) {
           emit({ type: "shield", on: true });
           addLog(`Privacy Shield locked ON by ${OWNER_NAME}`);
         }
+        break;
+      case "request":
+        setActiveRequest({ id: e.id, text: e.text });
+        addLog(`Request from ${OWNER_NAME}: “${e.text}”`);
         break;
       case "tap": {
         const id = nanoid(6);
@@ -363,7 +370,11 @@ export default function HelperView({ room }: { room: string }) {
         </span>
         <div className="ml-auto flex items-center gap-2.5">
           <AppearanceBar compact />
-          {peer && <span className="hidden font-mono text-[13px] font-semibold text-gp-muted sm:inline">{formatClock(elapsed)}</span>}
+          {peer && (
+            <span className="hidden font-mono text-[13px] font-semibold text-gp-muted sm:inline">
+              {formatClock(elapsed)}
+            </span>
+          )}
           <button
             type="button"
             onClick={endSession}
@@ -379,6 +390,30 @@ export default function HelperView({ room }: { room: string }) {
         <main ref={mainRef} className="relative flex min-h-[620px] flex-1 flex-col items-center justify-center p-6 lg:min-h-0">
           {peer ? (
             <>
+              {/* Incoming Help Request Banner from Phone Owner */}
+              {activeRequest && (
+                <div
+                  key={activeRequest.id}
+                  className="gp-drop mb-3 flex w-full max-w-md items-center gap-3 rounded-2xl border border-volt bg-volt/15 px-4 py-2.5 shadow-lg"
+                >
+                  <HelpCircle className="h-5 w-5 shrink-0 text-volt" />
+                  <div className="min-w-0 flex-1">
+                    <div className="text-[11px] font-bold uppercase tracking-wider text-volt">
+                      Request from {OWNER_NAME}
+                    </div>
+                    <p className="truncate text-[0.9rem] font-bold text-gp-text">“{activeRequest.text}”</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setActiveRequest(null)}
+                    aria-label="Dismiss request"
+                    className="grid h-7 w-7 cursor-pointer place-items-center rounded-lg text-gp-sub hover:bg-gp-hover hover:text-gp-text"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+              )}
+
               <div className="mb-3 flex flex-wrap items-center justify-center gap-2 text-[0.86rem] font-semibold text-gp-sub">
                 <Eye className="h-4 w-4 text-laser" />
                 Live view of {OWNER_NAME}&apos;s phone ·{" "}

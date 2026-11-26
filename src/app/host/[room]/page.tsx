@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import type { Metadata } from "next";
 import HostView from "@/components/HostView";
 import { normalizeRoom } from "@/lib/ids";
@@ -9,5 +10,9 @@ export const metadata: Metadata = {
 
 export default async function HostPage({ params }: PageProps<"/host/[room]">) {
   const { room } = await params;
-  return <HostView room={normalizeRoom(room)} />;
+  return (
+    <Suspense fallback={<div className="min-h-dvh bg-gp-bg" />}>
+      <HostView room={normalizeRoom(room)} />
+    </Suspense>
+  );
 }

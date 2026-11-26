@@ -44,6 +44,7 @@ export type RoomEvent =
   | { type: "shield"; on: boolean } // helper -> host
   | { type: "mandatory-shield"; locked: boolean } // host -> helper (locks helper shield on)
   | { type: "prefs-open"; open: boolean } // host -> helper (blurs helper mirror while open)
+  | { type: "request"; id: string; text: string } // host -> helper (user asks for specific help)
   | { type: "state"; state: AppState } // host -> helper (mirror sync)
   | { type: "viewport"; h: number } // host -> helper (logical height)
   | { type: "tap"; x: number; y: number } // host -> helper (where the owner tapped)

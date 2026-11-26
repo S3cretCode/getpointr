@@ -1,17 +1,23 @@
 "use client";
 
-import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent, type PointerEvent as ReactPointerEvent } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
+import { nanoid } from "nanoid";
 import {
   Ban,
   Check,
   Copy,
+  Cpu,
   EyeOff,
+  HelpCircle,
   KeyRound,
   Laptop,
   Lock,
+  MessageSquarePlus,
   Moon,
   RotateCcw,
+  Send,
   Share2,
   ShieldCheck,
   SlidersHorizontal,
@@ -29,21 +35,39 @@ import { applyAction } from "@/lib/bank";
 import { formatClock, useElementSize, useOrigin } from "@/lib/hooks";
 import { usePreferences, type TextScale } from "@/lib/preferences";
 import {
+  LOCAL_AI_SUGGESTIONS,
+  nextLocalAiStep,
+  parseLocalRequest,
+  type LocalGoal,
+} from "@/lib/localAiGuide";
+import {
   HELPER_NAME,
   HELPER_SHORT,
   INITIAL_STATE,
+  SCREEN_LABEL,
   type AppState,
   type BankAction,
   type Marker,
   type Pt,
   type RoomEvent,
+  type Screen,
+  type Tool,
 } from "@/lib/types";
 
 type Guide = "idle" | "offer" | "running";
 
 type ReplayAction =
   | { kind: "laser"; path: Pt[] }
-  | { kind: "markers"; markers: Marker[] };
+  | { kind: "markers"; markers: Marker[] }
+  | { kind: "target"; target: string; tool: Tool };
+
+const QUICK_HELPER_REQUESTS = [
+  "Where do I tap to send money?",
+  "Which button goes back one screen?",
+  "Please go a little slower",
+  "How do I lock my debit card?",
+  "Is this verification code safe?",
+];
 
 function guideFor(s: AppState): { target: string | null; text: string } {
   switch (s.screen) {
@@ -72,7 +96,6 @@ function buzz(pattern: number | number[]) {
   }
 }
 
-/** Interpolates extra intermediate steps between distant drag points so playback is smooth and unhurried. */
 function smoothLaserPath(raw: Pt[]): Pt[] {
   if (raw.length <= 1) return raw;
   const out: Pt[] = [raw[0]];
@@ -97,6 +120,8 @@ const TEXT_OPTS: { id: TextScale; label: string; sample: string }[] = [
 
 export default function HostView({ room }: { room: string }) {
   const origin = useOrigin();
+  const searchParams = useSearchParams();
+  const initialAiQuery = searchParams.get("ai");
   const helperUrl = origin ? `${origin}/helper/${room}` : "";
   const { theme, setTheme, textScale, setTextScale } = usePreferences();
 
@@ -105,10 +130,12 @@ export default function HostView({ room }: { room: string }) {
   const [markers, setMarkers] = useState<Marker[]>([]);
   const markersRef = useRef<Marker[]>([]);
   const [trail, setTrail] = useState<Pt[]>([]);
-  const [lastReplay, setLastReplay] = useState<ReplayAction | null>(null);
-  const [replaying, setReplaying] = useState(false);
 
-  // Queue-based smooth laser playback (~75ms per step so fast helper drags feel calm and easy to follow)
+  // Per-screen replay map: ONLY shows replay saved on the exact screen the user is currently viewing!
+  const [replaysByScreen, setReplaysByScreen] = useState<Partial<Record<Screen, ReplayAction>>>({});
+  const [replaying, setReplaying] = useState(false);
+  const [replayFlashKey, setReplayFlashKey] = useState(0);
+
   const laserQueue = useRef<Pt[]>([]);
   const currentGesture = useRef<Pt[]>([]);
   const laserTicker = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -120,6 +147,14 @@ export default function HostView({ room }: { room: string }) {
   const [mandatoryShield, setMandatoryShield] = useState(true);
   const mandatoryShieldRef = useRef(true);
 
+  // Local On-Device AI state + Requests popup state
+  const [localAi, setLocalAi] = useState<{ goal: LocalGoal; summary: string } | null>(() =>
+    initialAiQuery ? parseLocalRequest(initialAiQuery) : null,
+  );
+  const [requestTab, setRequestTab] = useState<"ai" | "helper">("ai");
+  const [requestInput, setRequestInput] = useState("");
+  const [requestSentToast, setRequestSentToast] = useState<string | null>(null);
+
   const [verifying, setVerifying] = useState(true);
   const [prefsOpen, setPrefsOpen] = useState(false);
   const prefsOpenRef = useRef(false);
@@ -127,7 +162,7 @@ export default function HostView({ room }: { room: string }) {
 
   const [guide, setGuide] = useState<Guide>("idle");
   const [countdown, setCountdown] = useState(6);
-  const [sheet, setSheet] = useState<null | "invite">(null);
+  const [sheet, setSheet] = useState<null | "invite" | "request">(null);
   const [ended, setEnded] = useState<null | { by: "you" | "helper"; duration: number; pointers: number }>(null);
   const [copied, setCopied] = useState(false);
 
@@ -138,7 +173,6 @@ export default function HostView({ room }: { room: string }) {
   const stageRef = useRef<HTMLDivElement>(null);
   const [mainRef, size] = useElementSize<HTMLDivElement>();
 
-  // Full-bleed on phones, framed iPhone on wider screens
   const fill = size.w > 0 && size.w < 640;
   let H = 800;
   let scale = 1;
@@ -153,6 +187,10 @@ export default function HostView({ room }: { room: string }) {
   const setMarkersBoth = (m: Marker[]) => {
     markersRef.current = m;
     setMarkers(m);
+  };
+
+  const saveScreenReplay = (scr: Screen, action: ReplayAction) => {
+    setReplaysByScreen((prev) => ({ ...prev, [scr]: action }));
   };
 
   const ensureLaserPlayback = () => {
@@ -200,17 +238,24 @@ export default function HostView({ room }: { room: string }) {
     ensureLaserPlayback();
   };
 
+  const activeScreenReplay = replaysByScreen[state.screen] ?? null;
+
   const triggerReplay = () => {
-    if (!lastReplay) return;
-    if (lastReplay.kind === "laser") {
-      playFullPath(lastReplay.path);
-    } else {
+    if (!activeScreenReplay) return;
+    if (activeScreenReplay.kind === "laser") {
+      playFullPath(activeScreenReplay.path);
+    } else if (activeScreenReplay.kind === "markers") {
       setReplaying(true);
       setMarkersBoth([]);
       setTimeout(() => {
-        setMarkersBoth(lastReplay.markers.map((m) => ({ ...m, done: false })));
+        setMarkersBoth(activeScreenReplay.markers.map((m) => ({ ...m, done: false })));
         setReplaying(false);
       }, 120);
+    } else {
+      // Re-triggers pop/pulse animation on Local AI / Guided target for this exact page
+      setReplaying(true);
+      setReplayFlashKey((k) => k + 1);
+      setTimeout(() => setReplaying(false), 450);
     }
   };
 
@@ -229,7 +274,7 @@ export default function HostView({ room }: { room: string }) {
         if (fresh.length) {
           received.current += fresh.length;
           buzz(35);
-          setLastReplay({ kind: "markers", markers: e.markers });
+          saveScreenReplay(stateRef.current.screen, { kind: "markers", markers: e.markers });
         }
         setMarkersBoth(e.markers);
         break;
@@ -241,7 +286,7 @@ export default function HostView({ room }: { room: string }) {
         const recorded = e.path && e.path.length > 1 ? e.path : [...currentGesture.current];
         if (recorded.length > 1) {
           received.current += 1;
-          setLastReplay({ kind: "laser", path: recorded });
+          saveScreenReplay(stateRef.current.screen, { kind: "laser", path: recorded });
         }
         currentGesture.current = [];
         break;
@@ -270,6 +315,7 @@ export default function HostView({ room }: { room: string }) {
       setGuide("idle");
       setSheet(null);
       setEnded(null);
+      setRequestTab("helper");
       emit({ type: "state", state: stateRef.current });
       emit({ type: "viewport", h: hRef.current });
       emit({ type: "mandatory-shield", locked: mandatoryShieldRef.current });
@@ -300,9 +346,9 @@ export default function HostView({ room }: { room: string }) {
     };
   }, [send]);
 
-  // Offer the 60-second guided demo shortly after the user finishes choosing preferences if no helper connected
+  // Offer the 60-second guided demo only if neither a human helper nor Local AI is active
   useEffect(() => {
-    if (!prefsCompletedOnce || prefsOpen || peer) return;
+    if (!prefsCompletedOnce || prefsOpen || peer || localAi) return;
     const o = setTimeout(() => {
       if (!peerRef.current && !prefsOpenRef.current) {
         setCountdown(6);
@@ -310,7 +356,7 @@ export default function HostView({ room }: { room: string }) {
       }
     }, 3200);
     return () => clearTimeout(o);
-  }, [prefsCompletedOnce, prefsOpen, peer]);
+  }, [prefsCompletedOnce, prefsOpen, peer, localAi]);
 
   useEffect(() => {
     if (guide !== "offer") return;
@@ -325,6 +371,9 @@ export default function HostView({ room }: { room: string }) {
     }, 1000);
     return () => clearInterval(iv);
   }, [guide]);
+
+  const effectivePrivacyShield = mandatoryShield || shieldOn;
+  const aiStep = localAi && !prefsOpen ? nextLocalAiStep(localAi.goal, state, effectivePrivacyShield) : null;
 
   const openPreferences = () => {
     prefsOpenRef.current = true;
@@ -348,14 +397,55 @@ export default function HostView({ room }: { room: string }) {
     send({ type: "mandatory-shield", locked: next });
   };
 
-  // Owner actions
+  const launchLocalAiRequest = (rawQuery: string) => {
+    const text = rawQuery.trim();
+    if (!text) return;
+    const parsed = parseLocalRequest(text);
+    setGuide("idle");
+    setLocalAi(parsed);
+    const step = nextLocalAiStep(parsed.goal, stateRef.current, effectivePrivacyShield);
+    if (step.target) {
+      saveScreenReplay(stateRef.current.screen, { kind: "target", target: step.target, tool: step.tool });
+    }
+    received.current += 1;
+    setRequestInput("");
+    setSheet(null);
+  };
+
+  const sendHelperRequest = (rawText: string) => {
+    const text = rawText.trim();
+    if (!text) return;
+    send({ type: "request", id: nanoid(6), text });
+    setRequestSentToast(`Sent request: “${text}”`);
+    setTimeout(() => setRequestSentToast(null), 4500);
+    setRequestInput("");
+    setSheet(null);
+  };
+
+  const onRequestSubmit = (e: FormEvent) => {
+    e.preventDefault();
+    if (requestTab === "ai") launchLocalAiRequest(requestInput);
+    else sendHelperRequest(requestInput);
+  };
+
+  // Clear in-flight laser trail when switching screens so stale trails never carry over
   const onAction = (a: BankAction) => {
     const prev = stateRef.current;
     const next = applyAction(prev, a);
     if (next === prev) return;
     stateRef.current = next;
     setState(next);
-    if (next.screen !== prev.screen && markersRef.current.length) setMarkersBoth([]);
+    if (next.screen !== prev.screen) {
+      if (markersRef.current.length) setMarkersBoth([]);
+      laserQueue.current = [];
+      setTrail([]);
+      if (localAi) {
+        const nextStep = nextLocalAiStep(localAi.goal, next, effectivePrivacyShield);
+        if (nextStep.target) {
+          saveScreenReplay(next.screen, { kind: "target", target: nextStep.target, tool: nextStep.tool });
+        }
+      }
+    }
     send({ type: "state", state: next });
     if (a.type === "continue") setTimeout(() => onAction({ type: "sms" }), 1100);
   };
@@ -386,6 +476,7 @@ export default function HostView({ room }: { room: string }) {
   const restartGuide = () => {
     stateRef.current = INITIAL_STATE;
     setState(INITIAL_STATE);
+    setLocalAi(null);
     setGuide("running");
   };
 
@@ -416,12 +507,19 @@ export default function HostView({ room }: { room: string }) {
   };
 
   const g = guideFor(state);
-  const guideRunning = guide === "running";
+  const guideRunning = guide === "running" && !localAi;
   const guideDone = guideRunning && state.screen === "success";
 
+  // Guidance strip copy
   let stripFrom = "GetPointr";
-  let stripText = `Waiting for your trusted helper. Share code ${room} or tap Invite.`;
-  if (peer) {
+  let stripText = `Need help? Tap “Ask Help” above for instant On-Device Local AI or invite your helper (code ${room}).`;
+  if (requestSentToast) {
+    stripFrom = "Request sent";
+    stripText = requestSentToast;
+  } else if (aiStep) {
+    stripFrom = `On-Device Local AI · ${localAi!.summary}`;
+    stripText = aiStep.caption;
+  } else if (peer) {
     stripFrom = `${HELPER_SHORT} · Trusted helper`;
     stripText =
       caption?.text ?? `${HELPER_SHORT} can see your screen and point, and can never tap or type for you.`;
@@ -437,12 +535,23 @@ export default function HostView({ room }: { room: string }) {
     >
       {/* Header */}
       <header
-        className="flex shrink-0 items-center gap-2 border-b border-gp-border bg-gp-surface px-3"
+        className="flex shrink-0 items-center gap-1.5 border-b border-gp-border bg-gp-surface px-3"
         style={{ paddingTop: "env(safe-area-inset-top)", minHeight: 54 }}
       >
-        <Logo size={26} />
-        <StatusPill peer={peer} guide={guideRunning} />
-        <div className="ml-auto flex items-center gap-1">
+        <Logo size={25} />
+        <StatusPill peer={peer} guide={guideRunning} localAi={!!localAi} />
+        <div className="ml-auto flex items-center gap-1.5">
+          <button
+            type="button"
+            onClick={() => {
+              setRequestTab(peer ? "helper" : "ai");
+              setSheet("request");
+            }}
+            className="inline-flex h-10 cursor-pointer items-center gap-1.5 rounded-xl bg-volt px-3 text-[12px] font-bold text-white shadow-xs transition-colors hover:bg-violet-600"
+          >
+            <MessageSquarePlus className="h-4 w-4" />
+            <span>Ask Help</span>
+          </button>
           <button
             type="button"
             onClick={openPreferences}
@@ -451,7 +560,7 @@ export default function HostView({ room }: { room: string }) {
             className="inline-flex h-10 cursor-pointer items-center gap-1.5 rounded-xl border border-gp-border bg-gp-card px-2.5 text-[12px] font-bold text-gp-sub transition-colors hover:bg-gp-hover hover:text-gp-text"
           >
             <SlidersHorizontal className="h-4 w-4" />
-            <span className="hidden sm:inline">Preferences</span>
+            <span className="hidden md:inline">Preferences</span>
           </button>
           <button
             type="button"
@@ -472,33 +581,44 @@ export default function HostView({ room }: { room: string }) {
         </div>
       </header>
 
-      {/* Guidance strip + Replay button */}
+      {/* Guidance strip + Per-Screen Replay button */}
       <div className="flex min-h-[74px] shrink-0 items-center gap-3 border-b border-gp-border bg-gp-surface/85 px-3 py-2">
         <span
           className={`grid h-9 w-9 shrink-0 place-items-center rounded-full text-[14px] font-bold text-white ${
-            peer ? "bg-volt" : guideRunning ? "bg-laser" : "bg-slate-600"
+            localAi ? "bg-emerald-600" : peer ? "bg-volt" : guideRunning ? "bg-laser" : "bg-slate-600"
           }`}
         >
-          {peer ? "A" : guideRunning ? <Sparkles className="h-4 w-4" /> : <UserCheck className="h-4 w-4" />}
+          {localAi ? <Cpu className="h-4 w-4" /> : peer ? "A" : guideRunning ? <Sparkles className="h-4 w-4" /> : <UserCheck className="h-4 w-4" />}
         </span>
         <div key={caption?.id ?? stripText} className="gp-rise min-w-0 flex-1" aria-live="polite">
           <div className="flex flex-wrap items-center gap-2 text-[0.72rem] font-bold uppercase tracking-wide text-gp-muted">
-            {stripFrom}
-            {(shieldOn || mandatoryShield) && (
+            <span className="truncate">{stripFrom}</span>
+            {effectivePrivacyShield && (
               <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/15 px-2 py-0.5 text-[10px] font-bold normal-case tracking-normal text-emerald-600 dark:text-emerald-300">
                 {mandatoryShield ? <Lock className="h-3 w-3" /> : <EyeOff className="h-3 w-3" />}
                 {mandatoryShield ? "Mandatory Shield ON" : "Private info hidden"}
               </span>
             )}
+            {localAi && (
+              <button
+                type="button"
+                onClick={() => setLocalAi(null)}
+                className="cursor-pointer rounded-full border border-gp-border bg-gp-card px-2 py-0.5 text-[10px] font-bold normal-case tracking-normal text-gp-sub hover:bg-gp-hover"
+              >
+                Stop Local AI
+              </button>
+            )}
           </div>
           <p className="line-clamp-2 text-[0.92rem] font-medium leading-snug text-gp-text">{stripText}</p>
         </div>
 
-        {lastReplay && (
+        {/* Per-Screen Replay: ONLY appears when a replay exists for `state.screen` */}
+        {activeScreenReplay && (
           <button
             type="button"
             onClick={triggerReplay}
             disabled={replaying}
+            title={`Replay guidance for ${SCREEN_LABEL[state.screen]}`}
             className="inline-flex h-10 shrink-0 cursor-pointer items-center gap-1.5 rounded-xl bg-laser px-3 text-[0.82rem] font-bold text-white shadow-sm transition-colors hover:bg-orange-600 disabled:opacity-60"
           >
             <RotateCcw className={`h-4 w-4 ${replaying ? "animate-spin" : ""}`} />
@@ -514,8 +634,22 @@ export default function HostView({ room }: { room: string }) {
             <Stage height={H} scale={scale} innerRef={stageRef} framed={!fill}>
               <MockBankApp state={state} onAction={onAction} />
               <MarkerLayer markers={markers} trail={trail} />
+              {aiStep?.target && (
+                <GuideMarker
+                  key={`ai-${state.screen}-${aiStep.target}-${replayFlashKey}`}
+                  target={aiStep.target}
+                  stageRef={stageRef}
+                  scale={scale}
+                  tool={aiStep.tool}
+                />
+              )}
               {guideRunning && g.target && (
-                <GuideMarker key={`${state.screen}-${g.target}`} target={g.target} stageRef={stageRef} scale={scale} />
+                <GuideMarker
+                  key={`guide-${state.screen}-${g.target}-${replayFlashKey}`}
+                  target={g.target}
+                  stageRef={stageRef}
+                  scale={scale}
+                />
               )}
             </Stage>
           </div>
@@ -532,17 +666,16 @@ export default function HostView({ room }: { room: string }) {
               <ShieldCheck className="h-4 w-4" /> Your Session Preferences
             </div>
             <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/15 px-2.5 py-0.5 text-[11px] font-bold text-emerald-500">
-              <EyeOff className="h-3 w-3" /> Blurred on helper screen
+              <EyeOff className="h-3 w-3" /> Blurred for helper &amp; AI
             </span>
           </div>
           <h2 className="mt-1.5 text-[1.25rem] font-extrabold tracking-tight text-gp-text">
             Choose comfort &amp; privacy settings
           </h2>
           <p className="mt-1 text-[0.9rem] font-medium leading-relaxed text-gp-sub">
-            Your helper cannot see this menu while you adjust your settings.
+            Neither your helper nor the Local AI can view this menu while you adjust your preferences.
           </p>
 
-          {/* Mandatory Privacy Shield */}
           <div className="mt-4 flex items-start gap-3 rounded-2xl border border-gp-border bg-gp-elevated p-3.5">
             <span className="mt-0.5 grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-emerald-500/15 text-emerald-500">
               <Lock className="h-4 w-4" />
@@ -550,7 +683,8 @@ export default function HostView({ room }: { room: string }) {
             <div className="flex-1">
               <div className="text-[0.95rem] font-bold text-gp-text">Mandatory Privacy Shield</div>
               <p className="mt-0.5 text-[0.82rem] font-medium leading-snug text-gp-sub">
-                Locks Privacy Shield ON so your helper can never unblur balances, passwords, or verification codes.
+                Locks Privacy Shield ON for both human helpers and On-Device Local AI so balances, passwords, and codes
+                can never be unblurred.
               </p>
             </div>
             <button
@@ -571,7 +705,6 @@ export default function HostView({ room }: { room: string }) {
             </button>
           </div>
 
-          {/* Theme Mode */}
           <div className="mt-4">
             <div className="text-[0.8rem] font-bold uppercase tracking-wider text-gp-muted">Appearance</div>
             <div className="mt-1.5 grid grid-cols-2 gap-2">
@@ -600,7 +733,6 @@ export default function HostView({ room }: { room: string }) {
             </div>
           </div>
 
-          {/* Text Size */}
           <div className="mt-4">
             <div className="text-[0.8rem] font-bold uppercase tracking-wider text-gp-muted">Text size</div>
             <div className="mt-1.5 grid grid-cols-3 gap-2">
@@ -635,17 +767,134 @@ export default function HostView({ room }: { room: string }) {
         </Sheet>
       )}
 
-      {guide === "offer" && !peer && !prefsOpen && (
+      {/* Requests + 100% On-Device Local AI Popup */}
+      {sheet === "request" && (
+        <Sheet onClose={() => setSheet(null)}>
+          <div className="flex items-center justify-between gap-2">
+            <span className="inline-flex items-center gap-1.5 text-[0.76rem] font-bold uppercase tracking-wide text-volt">
+              <HelpCircle className="h-4 w-4" /> Specific Help Request
+            </span>
+            <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/15 px-2.5 py-0.5 text-[11px] font-bold text-emerald-500">
+              <Lock className="h-3 w-3" /> Privacy Shield {effectivePrivacyShield ? "ON" : "Optional"}
+            </span>
+          </div>
+          <h2 className="mt-1 text-[1.22rem] font-extrabold tracking-tight text-gp-text">
+            What do you need help with?
+          </h2>
+
+          {/* Mode selector: On-Device Local AI vs Human Helper */}
+          <div className="mt-3 grid grid-cols-2 gap-2 rounded-xl border border-gp-border bg-gp-elevated p-1">
+            <button
+              type="button"
+              onClick={() => setRequestTab("ai")}
+              className={`flex h-10 cursor-pointer items-center justify-center gap-1.5 rounded-lg text-[0.84rem] font-bold transition-colors ${
+                requestTab === "ai" ? "bg-emerald-600 text-white shadow-xs" : "text-gp-sub hover:text-gp-text"
+              }`}
+            >
+              <Cpu className="h-4 w-4" /> Local AI (Instant)
+            </button>
+            <button
+              type="button"
+              onClick={() => setRequestTab("helper")}
+              className={`flex h-10 cursor-pointer items-center justify-center gap-1.5 rounded-lg text-[0.84rem] font-bold transition-colors ${
+                requestTab === "helper" ? "bg-volt text-white shadow-xs" : "text-gp-sub hover:text-gp-text"
+              }`}
+            >
+              <UserCheck className="h-4 w-4" /> {peer ? `Ask ${HELPER_SHORT}` : "Ask Helper"}
+            </button>
+          </div>
+
+          {requestTab === "ai" ? (
+            <div className="mt-3">
+              <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-3 text-[12px] font-medium leading-relaxed text-gp-sub">
+                <div className="font-bold text-emerald-600 dark:text-emerald-300">
+                  100% On-Device Local AI Algorithm (Zero Cloud Servers)
+                </div>
+                Runs strictly inside your browser and receives the exact same Privacy Shield masking as a human helper:
+                <div className="mt-1.5 rounded-lg bg-gp-bg/80 px-2.5 py-1 font-mono text-[11px] font-semibold text-gp-muted">
+                  AI input: screen={state.screen} | balance={effectivePrivacyShield ? "[HIDDEN]" : "$5,240.18"} | 2fa=
+                  {effectivePrivacyShield ? "[HIDDEN]" : "visible"}
+                </div>
+              </div>
+
+              <div className="mt-3 text-[11px] font-bold uppercase tracking-wider text-gp-muted">
+                Tap a common need or type below
+              </div>
+              <div className="mt-1.5 flex flex-wrap gap-1.5">
+                {LOCAL_AI_SUGGESTIONS.map((s) => (
+                  <button
+                    key={s}
+                    type="button"
+                    onClick={() => launchLocalAiRequest(s)}
+                    className="cursor-pointer rounded-full border border-gp-border bg-gp-card px-3 py-1.5 text-[12px] font-semibold text-gp-sub transition-colors hover:border-emerald-500 hover:bg-gp-hover hover:text-gp-text"
+                  >
+                    {s}
+                  </button>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <div className="mt-3">
+              <p className="text-[0.86rem] font-medium text-gp-sub">
+                {peer
+                  ? `Send a specific request straight to ${HELPER_NAME}. They will see an alert on their console.`
+                  : "No human helper is connected yet. You can still queue a request or switch to Local AI for instant guidance."}
+              </p>
+              <div className="mt-2.5 flex flex-wrap gap-1.5">
+                {QUICK_HELPER_REQUESTS.map((q) => (
+                  <button
+                    key={q}
+                    type="button"
+                    onClick={() => sendHelperRequest(q)}
+                    className="cursor-pointer rounded-full border border-gp-border bg-gp-card px-3 py-1.5 text-[12px] font-semibold text-gp-sub transition-colors hover:border-volt hover:bg-gp-hover hover:text-gp-text"
+                  >
+                    {q}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <form onSubmit={onRequestSubmit} className="mt-3.5 flex gap-2">
+            <label htmlFor="req-box" className="sr-only">
+              Describe what you need
+            </label>
+            <input
+              id="req-box"
+              value={requestInput}
+              onChange={(e) => setRequestInput(e.target.value)}
+              maxLength={140}
+              placeholder={
+                requestTab === "ai"
+                  ? "Type what you want to do, e.g. Send $250 to David..."
+                  : "Type a specific question for your helper..."
+              }
+              className="h-11 min-w-0 flex-1 rounded-xl border border-gp-border bg-gp-bg px-3.5 text-[0.92rem] font-medium text-gp-text placeholder:text-gp-muted focus:outline-none focus:ring-2 focus:ring-laser"
+            />
+            <button
+              type="submit"
+              disabled={!requestInput.trim()}
+              className={`inline-flex h-11 shrink-0 cursor-pointer items-center gap-1.5 rounded-xl px-4 text-[0.9rem] font-bold text-white transition-colors disabled:cursor-not-allowed disabled:opacity-45 ${
+                requestTab === "ai" ? "bg-emerald-600 hover:bg-emerald-500" : "bg-volt hover:bg-violet-600"
+              }`}
+            >
+              <Send className="h-4 w-4" /> {requestTab === "ai" ? "Guide me" : "Send"}
+            </button>
+          </form>
+        </Sheet>
+      )}
+
+      {guide === "offer" && !peer && !prefsOpen && !localAi && sheet === null && (
         <Sheet onClose={() => setGuide("idle")}>
           <div className="flex items-center gap-2 text-[0.78rem] font-bold uppercase tracking-wide text-laser">
             <Sparkles className="h-4 w-4" /> No helper connected yet
           </div>
           <h2 className="mt-1 text-[1.25rem] font-extrabold tracking-tight text-gp-text">
-            Try the 60-second guided demo
+            How would you like to be guided?
           </h2>
           <p className="mt-1 text-[0.92rem] font-medium leading-relaxed text-gp-sub">
-            You will see exactly what a real helper sends: glowing pointers that show you where to tap. You stay in
-            control the whole time.
+            Watch the 60-second walkthrough, type any custom request for our 100% On-Device Local AI, or invite a real
+            helper.
           </p>
           <div className="mt-4 grid gap-2">
             <button
@@ -653,7 +902,18 @@ export default function HostView({ room }: { room: string }) {
               onClick={() => setGuide("running")}
               className="h-12 cursor-pointer rounded-xl bg-laser text-[0.96rem] font-bold text-white transition-colors hover:bg-orange-600"
             >
-              Start guided demo ({Math.max(countdown, 0)})
+              Start 60-second demo ({Math.max(countdown, 0)})
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setGuide("idle");
+                setRequestTab("ai");
+                setSheet("request");
+              }}
+              className="flex h-12 cursor-pointer items-center justify-center gap-2 rounded-xl bg-emerald-600 text-[0.96rem] font-bold text-white transition-colors hover:bg-emerald-500"
+            >
+              <Cpu className="h-4 w-4" /> Ask On-Device Local AI
             </button>
             <button
               type="button"
@@ -682,7 +942,7 @@ export default function HostView({ room }: { room: string }) {
               <Ban className="mt-0.5 h-4 w-4 shrink-0 text-laser" /> Remote control: Blocked (0 remote taps possible)
             </li>
             <li className="flex gap-2">
-              <EyeOff className="mt-0.5 h-4 w-4 shrink-0 text-laser" /> Balance &amp; code hidden from the helper
+              <EyeOff className="mt-0.5 h-4 w-4 shrink-0 text-laser" /> Balance &amp; code hidden from helper and AI
             </li>
             <li className="flex gap-2">
               <KeyRound className="mt-0.5 h-4 w-4 shrink-0 text-laser" /> Only pre-paired devices can connect
@@ -700,11 +960,12 @@ export default function HostView({ room }: { room: string }) {
               type="button"
               onClick={() => {
                 setGuide("idle");
-                setSheet("invite");
+                setRequestTab("ai");
+                setSheet("request");
               }}
-              className="h-12 cursor-pointer rounded-xl bg-laser text-[0.95rem] font-bold text-white transition-colors hover:bg-orange-600"
+              className="h-12 cursor-pointer rounded-xl bg-emerald-600 text-[0.95rem] font-bold text-white transition-colors hover:bg-emerald-500"
             >
-              Try a real helper
+              Ask Local AI
             </button>
           </div>
         </Sheet>
@@ -742,18 +1003,6 @@ export default function HostView({ room }: { room: string }) {
               <Share2 className="h-4 w-4" /> Share
             </button>
           </div>
-          {!guideRunning && !peer && (
-            <button
-              type="button"
-              onClick={() => {
-                setSheet(null);
-                setGuide("running");
-              }}
-              className="mt-3 w-full cursor-pointer text-center text-[0.86rem] font-bold text-gp-sub underline-offset-4 hover:underline"
-            >
-              No helper handy? Run the guided demo
-            </button>
-          )}
         </Sheet>
       )}
 
@@ -768,7 +1017,7 @@ export default function HostView({ room }: { room: string }) {
           <p className="mt-1 text-[0.92rem] font-medium text-gp-muted">Session log (metadata only)</p>
           <dl className="mt-4 w-full max-w-sm divide-y divide-gp-border rounded-2xl border border-gp-border bg-gp-card px-4 text-left text-[0.9rem]">
             <Row k="Duration" v={formatClock(ended.duration)} />
-            <Row k="Helper" v={HELPER_NAME} />
+            <Row k="Helper" v={localAi && !peer ? "On-Device Local AI" : HELPER_NAME} />
             <Row k="Visual pointers received" v={String(ended.pointers)} />
             <Row k="Remote control" v="Blocked (0 remote taps)" />
             <Row k="Screen data stored" v="None" />
@@ -794,21 +1043,27 @@ function Row({ k, v }: { k: string; v: string }) {
   );
 }
 
-function StatusPill({ peer, guide }: { peer: boolean; guide: boolean }) {
+function StatusPill({ peer, guide, localAi }: { peer: boolean; guide: boolean; localAi: boolean }) {
   if (peer)
     return (
-      <span className="ml-1 inline-flex items-center gap-1.5 rounded-full bg-emerald-500/15 px-2.5 py-1 text-[12px] font-bold text-emerald-600 dark:text-emerald-300">
+      <span className="ml-1 hidden items-center gap-1.5 rounded-full bg-emerald-500/15 px-2.5 py-1 text-[12px] font-bold text-emerald-600 sm:inline-flex dark:text-emerald-300">
         <span className="h-2 w-2 rounded-full bg-emerald-500" /> {HELPER_SHORT} connected
+      </span>
+    );
+  if (localAi)
+    return (
+      <span className="ml-1 hidden items-center gap-1.5 rounded-full bg-emerald-500/15 px-2.5 py-1 text-[12px] font-bold text-emerald-600 sm:inline-flex dark:text-emerald-300">
+        <Cpu className="h-3.5 w-3.5" /> Local AI active
       </span>
     );
   if (guide)
     return (
-      <span className="ml-1 inline-flex items-center gap-1.5 rounded-full bg-laser/15 px-2.5 py-1 text-[12px] font-bold text-laser">
+      <span className="ml-1 hidden items-center gap-1.5 rounded-full bg-laser/15 px-2.5 py-1 text-[12px] font-bold text-laser sm:inline-flex">
         <Sparkles className="h-3 w-3" /> Guided demo
       </span>
     );
   return (
-    <span className="ml-1 inline-flex items-center gap-1.5 rounded-full border border-gp-border bg-gp-card px-2.5 py-1 text-[12px] font-bold text-gp-sub">
+    <span className="ml-1 hidden items-center gap-1.5 rounded-full border border-gp-border bg-gp-card px-2.5 py-1 text-[12px] font-bold text-gp-sub sm:inline-flex">
       <span className="gp-pulse-dot h-2 w-2 rounded-full bg-amber-500" /> Waiting
     </span>
   );
