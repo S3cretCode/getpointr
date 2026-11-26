@@ -1,6 +1,5 @@
-// GetPointr service worker: keeps the app installable and shows an offline page.
-// Realtime sessions always need the network, so pages are network-first.
-const VERSION = "gp-v1";
+// GetPointr service worker: keeps the app installable and shows an offline page only when offline.
+const VERSION = "gp-v2";
 const OFFLINE_URL = "/offline.html";
 
 self.addEventListener("install", (event) => {
@@ -22,9 +21,17 @@ self.addEventListener("fetch", (event) => {
   const url = new URL(req.url);
   if (req.method !== "GET" || url.origin !== self.location.origin) return;
 
-  // Pages: always try the network first, fall back to the offline page.
+  // Pages: always try the network directly (bypassing HTTP cache); only show offline.html if truly offline.
   if (req.mode === "navigate") {
-    event.respondWith(fetch(req).catch(() => caches.match(OFFLINE_URL)));
+    event.respondWith(
+      fetch(req).catch(async (err) => {
+        if (self.navigator && self.navigator.onLine === false) {
+          const cached = await caches.match(OFFLINE_URL);
+          if (cached) return cached;
+        }
+        throw err;
+      }),
+    );
     return;
   }
 
