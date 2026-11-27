@@ -24,7 +24,7 @@ async function loadFonts() {
   }
 }
 
-/** Link preview shown when the demo link is texted or shared. */
+/** Link preview shown when the website link is texted or shared. */
 export default async function OpengraphImage() {
   const fonts = await loadFonts();
 
@@ -35,63 +35,82 @@ export default async function OpengraphImage() {
           width: "100%",
           height: "100%",
           display: "flex",
-          flexDirection: "column",
-          justifyContent: "center",
-          padding: 80,
-          background: "linear-gradient(135deg, #070B14 0%, #0E1628 60%, #2a1406 100%)",
-          color: "white",
+          alignItems: "center",
+          justifyContent: "space-between",
+          padding: "72px 84px",
+          background: "linear-gradient(135deg, #181C22 0%, #232830 58%, #263445 100%)",
+          color: "#F6F5F0",
           fontFamily: fonts.length ? '"Plus Jakarta Sans"' : "sans-serif",
         }}
       >
-        <div style={{ display: "flex", alignItems: "center", gap: 20 }}>
-          <svg width="72" height="72" viewBox="0 0 36 36" fill="none">
-            <rect width="36" height="36" rx="10.5" fill="#FF6414" />
-            <rect
-              x="0.75"
-              y="0.75"
-              width="34.5"
-              height="34.5"
-              rx="9.75"
-              stroke="white"
-              strokeOpacity="0.26"
-              strokeWidth="1.5"
-            />
-            <path
-              d="M9.5 22.5A9.5 9.5 0 1 1 23.2 9.9"
-              stroke="white"
-              strokeOpacity="0.55"
-              strokeWidth="2.3"
-              strokeLinecap="round"
-            />
-            <circle cx="16.5" cy="16.5" r="4.2" fill="white" />
-            <path
-              d="M21.2 21.2L29.2 24.1L25.4 25.8L23.7 29.6L21.2 21.2Z"
-              fill="white"
-              stroke="#C23A08"
-              strokeWidth="1"
-              strokeLinejoin="round"
-            />
-          </svg>
-          <div style={{ fontSize: 46, fontWeight: 800, letterSpacing: "-0.02em", display: "flex" }}>
-            Get<span style={{ color: "#FF6414" }}>Pointr</span>
+        <div style={{ display: "flex", flexDirection: "column", justifyContent: "center", maxWidth: 740 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 20 }}>
+            <svg width="68" height="68" viewBox="0 0 40 40" fill="none">
+              <rect width="40" height="40" rx="10" fill="#232830" stroke="rgba(246,245,240,0.22)" strokeWidth="1.5" />
+              <path
+                d="M 23.8 30.8 A 11.5 11.5 0 1 1 30.8 23.6"
+                stroke="#78A3C8"
+                strokeWidth="3.8"
+                strokeLinecap="round"
+              />
+              <circle cx="19.5" cy="19.5" r="4.3" fill="#F6F5F0" />
+              <path
+                d="M 23.4 23.4 L 31.8 26.5 L 28.4 28.0 L 31.3 30.9 L 29.5 32.7 L 26.6 29.8 L 25.1 33.2 Z"
+                fill="#F6F5F0"
+              />
+            </svg>
+            <div style={{ fontSize: 44, fontWeight: 800, letterSpacing: "-0.02em", display: "flex" }}>
+              Get<span style={{ color: "#78A3C8" }}>Pointr</span>
+            </div>
+          </div>
+
+          <div
+            style={{
+              fontSize: 74,
+              fontWeight: 800,
+              letterSpacing: "-0.03em",
+              marginTop: 42,
+              lineHeight: 1.05,
+              display: "flex",
+              flexDirection: "column",
+            }}
+          >
+            <span>Point the way.</span>
+            <span style={{ color: "#78A3C8" }}>Never take over.</span>
+          </div>
+
+          <div style={{ fontSize: 28, fontWeight: 500, marginTop: 28, color: "#DCE1E8", display: "flex" }}>
+            Calm visual guidance with Privacy Shield. Scan or tap to try the live demo.
           </div>
         </div>
+
+        {/* Large signature Gentle Beacon emblem on the right */}
         <div
           style={{
-            fontSize: 78,
-            fontWeight: 800,
-            letterSpacing: "-0.03em",
-            marginTop: 44,
-            lineHeight: 1.04,
+            width: 248,
+            height: 248,
+            borderRadius: 56,
+            background: "#232830",
+            border: "2px solid rgba(246,245,240,0.16)",
+            boxShadow: "0 28px 64px rgba(0,0,0,0.45)",
             display: "flex",
-            flexDirection: "column",
+            alignItems: "center",
+            justifyContent: "center",
           }}
         >
-          <span>Point the way.</span>
-          <span style={{ color: "#FF6414" }}>Never take over.</span>
-        </div>
-        <div style={{ fontSize: 30, fontWeight: 500, marginTop: 32, color: "#CBD5E1", display: "flex" }}>
-          Remote help without remote control. Scan to try the live demo.
+          <svg width="204" height="204" viewBox="0 0 40 40" fill="none">
+            <path
+              d="M 23.8 30.8 A 11.5 11.5 0 1 1 30.8 23.6"
+              stroke="#78A3C8"
+              strokeWidth="3.6"
+              strokeLinecap="round"
+            />
+            <circle cx="19.5" cy="19.5" r="4.2" fill="#F6F5F0" />
+            <path
+              d="M 23.4 23.4 L 31.8 26.5 L 28.4 28.0 L 31.3 30.9 L 29.5 32.7 L 26.6 29.8 L 25.1 33.2 Z"
+              fill="#F6F5F0"
+            />
+          </svg>
         </div>
       </div>
     ),

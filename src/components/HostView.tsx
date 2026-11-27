@@ -27,7 +27,7 @@ import {
   X,
 } from "lucide-react";
 import MockBankApp from "./MockBankApp";
-import { Stage, W, FRAME_PAD, IPHONE_CHROME_H } from "./Stage";
+import { Stage, W, fitStageScale } from "./Stage";
 import { GuideMarker, MarkerLayer } from "./Markers";
 import { Logo } from "./Logo";
 import { useRoom, type SendFn } from "@/lib/room";
@@ -118,6 +118,9 @@ const TEXT_OPTS: { id: TextScale; label: string; sample: string }[] = [
   { id: "xl", label: "Extra Large", sample: "Aa++" },
 ];
 
+/** Fixed logical iPhone app height so the full framed iPhone stays consistent on mobile and desktop. */
+const APP_H = 710;
+
 export default function HostView({ room }: { room: string }) {
   const origin = useOrigin();
   const searchParams = useSearchParams();
@@ -131,7 +134,6 @@ export default function HostView({ room }: { room: string }) {
   const markersRef = useRef<Marker[]>([]);
   const [trail, setTrail] = useState<Pt[]>([]);
 
-  // Per-screen replay map: ONLY shows replay saved on the exact screen the user is currently viewing!
   const [replaysByScreen, setReplaysByScreen] = useState<Partial<Record<Screen, ReplayAction>>>({});
   const [replaying, setReplaying] = useState(false);
   const [replayFlashKey, setReplayFlashKey] = useState(0);
@@ -147,7 +149,6 @@ export default function HostView({ room }: { room: string }) {
   const [mandatoryShield, setMandatoryShield] = useState(true);
   const mandatoryShieldRef = useRef(true);
 
-  // Local On-Device AI state + Requests popup state
   const [localAi, setLocalAi] = useState<{ goal: LocalGoal; summary: string } | null>(() =>
     initialAiQuery ? parseLocalRequest(initialAiQuery) : null,
   );
@@ -169,22 +170,12 @@ export default function HostView({ room }: { room: string }) {
   const startedAt = useRef(0);
   const received = useRef(0);
   const peerRef = useRef(false);
-  const hRef = useRef(800);
   const stageRef = useRef<HTMLDivElement>(null);
   const [mainRef, size] = useElementSize<HTMLDivElement>();
 
-  const fill = size.w > 0 && size.w < 640;
-  let H = 740;
-  let scale = 1;
-  if (fill && size.h > 0) {
-    // Never shrink logical height below 720 so MockBankApp buttons/tabbar are never clipped
-    // and the helper's mirrored iPhone always keeps true iPhone proportions.
-    const naturalH = Math.round(size.h / (size.w / W));
-    H = Math.max(720, Math.min(844, naturalH));
-    scale = Math.min(size.w / W, size.h / H);
-  } else if (size.w > 0 && size.h > 0) {
-    scale = Math.min((size.h - 24 - FRAME_PAD * 2) / (H + IPHONE_CHROME_H), (size.w - 24 - FRAME_PAD * 2) / W, 1.04);
-  }
+  // Always show the full framed iPhone (Dynamic Island + bezel + Home Bar) scaled to fit cleanly on mobile & desktop
+  const padPx = size.w < 640 ? 12 : 24;
+  const scale = size.w > 0 && size.h > 0 ? fitStageScale(size.w - padPx, size.h - padPx, APP_H, 1.04) : 0.68;
 
   const setMarkersBoth = (m: Marker[]) => {
     markersRef.current = m;
@@ -254,7 +245,6 @@ export default function HostView({ room }: { room: string }) {
         setReplaying(false);
       }, 120);
     } else {
-      // Re-triggers pop/pulse animation on Local AI / Guided target for this exact page
       setReplaying(true);
       setReplayFlashKey((k) => k + 1);
       setTimeout(() => setReplaying(false), 450);
@@ -301,7 +291,7 @@ export default function HostView({ room }: { room: string }) {
         break;
       case "sync":
         emit({ type: "state", state: stateRef.current });
-        emit({ type: "viewport", h: hRef.current });
+        emit({ type: "viewport", h: APP_H });
         emit({ type: "mandatory-shield", locked: mandatoryShieldRef.current });
         emit({ type: "prefs-open", open: prefsOpenRef.current });
         break;
@@ -319,7 +309,7 @@ export default function HostView({ room }: { room: string }) {
       setEnded(null);
       setRequestTab("helper");
       emit({ type: "state", state: stateRef.current });
-      emit({ type: "viewport", h: hRef.current });
+      emit({ type: "viewport", h: APP_H });
       emit({ type: "mandatory-shield", locked: mandatoryShieldRef.current });
       emit({ type: "prefs-open", open: prefsOpenRef.current });
       emit({ type: "sync" });
@@ -328,12 +318,6 @@ export default function HostView({ room }: { room: string }) {
 
   const { send, peer } = useRoom(room, "host", handleEvent, handlePeer);
 
-  useEffect(() => {
-    hRef.current = H;
-    if (peer) send({ type: "viewport", h: H });
-  }, [H, peer, send]);
-
-  // Step 1: Trusted Circle handshake -> Step 2: Session Preferences popup opens automatically
   useEffect(() => {
     startedAt.current = Date.now();
     const v = setTimeout(() => {
@@ -348,7 +332,6 @@ export default function HostView({ room }: { room: string }) {
     };
   }, [send]);
 
-  // Offer the 60-second guided demo only if neither a human helper nor Local AI is active
   useEffect(() => {
     if (!prefsCompletedOnce || prefsOpen || peer || localAi) return;
     const o = setTimeout(() => {
@@ -430,7 +413,6 @@ export default function HostView({ room }: { room: string }) {
     else sendHelperRequest(requestInput);
   };
 
-  // Clear in-flight laser trail when switching screens so stale trails never carry over
   const onAction = (a: BankAction) => {
     const prev = stateRef.current;
     const next = applyAction(prev, a);
@@ -456,8 +438,8 @@ export default function HostView({ room }: { room: string }) {
     const el = stageRef.current;
     if (!el) return;
     const r = el.getBoundingClientRect();
-    const x = (ev.clientX - r.left) / scale;
-    const y = (ev.clientY - r.top) / scale;
+    const x = Math.min(W, Math.max(0, (ev.clientX - r.left) / scale));
+    const y = Math.min(APP_H, Math.max(0, (ev.clientY - r.top) / scale));
     send({ type: "tap", x, y });
     const hit = markersRef.current.find((m) => !m.done && Math.hypot(m.x - x, m.y - y) < 56);
     if (hit) {
@@ -512,9 +494,8 @@ export default function HostView({ room }: { room: string }) {
   const guideRunning = guide === "running" && !localAi;
   const guideDone = guideRunning && state.screen === "success";
 
-  // Guidance strip copy
   let stripFrom = "GetPointr";
-  let stripText = `Need help? Tap “Ask Help” above for instant On-Device Local AI or invite your helper (code ${room}).`;
+  let stripText = `Tap “Ask Help” above for On-Device Local AI, or share code ${room} with your helper.`;
   if (requestSentToast) {
     stripFrom = "Request sent";
     stripText = requestSentToast;
@@ -535,21 +516,23 @@ export default function HostView({ room }: { room: string }) {
       className="fixed inset-0 flex select-none flex-col overflow-hidden bg-gp-bg text-gp-text"
       style={{ height: "100dvh" }}
     >
-      {/* Header */}
+      {/* Compact Header */}
       <header
         className="flex shrink-0 items-center gap-1.5 border-b border-gp-border bg-gp-surface px-3"
-        style={{ paddingTop: "env(safe-area-inset-top)", minHeight: 54 }}
+        style={{ paddingTop: "env(safe-area-inset-top)", minHeight: 50 }}
       >
-        <Logo size={25} />
+        <Link href="/" aria-label="GetPointr home">
+          <Logo size={26} />
+        </Link>
         <StatusPill peer={peer} guide={guideRunning} localAi={!!localAi} />
-        <div className="ml-auto flex items-center gap-1.5">
+        <div className="ml-auto flex items-center gap-1">
           <button
             type="button"
             onClick={() => {
               setRequestTab(peer ? "helper" : "ai");
               setSheet("request");
             }}
-            className="inline-flex h-10 cursor-pointer items-center gap-1.5 rounded-xl bg-volt px-3 text-[12px] font-bold text-white shadow-xs transition-colors hover:bg-violet-600"
+            className="inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-xl bg-volt px-2.5 text-[12px] font-bold text-cream shadow-2xs transition-colors hover:bg-volt-dark"
           >
             <MessageSquarePlus className="h-4 w-4" />
             <span>Ask Help</span>
@@ -559,7 +542,7 @@ export default function HostView({ room }: { room: string }) {
             onClick={openPreferences}
             aria-label="Session preferences"
             title="Preferences & Privacy"
-            className="inline-flex h-10 cursor-pointer items-center gap-1.5 rounded-xl border border-gp-border bg-gp-card px-2.5 text-[12px] font-bold text-gp-sub transition-colors hover:bg-gp-hover hover:text-gp-text"
+            className="inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-xl border border-gp-border bg-gp-card px-2.5 text-[12px] font-bold text-gp-sub transition-colors hover:bg-gp-hover hover:text-gp-text"
           >
             <SlidersHorizontal className="h-4 w-4" />
             <span className="hidden md:inline">Preferences</span>
@@ -568,35 +551,43 @@ export default function HostView({ room }: { room: string }) {
             type="button"
             onClick={() => setSheet("invite")}
             aria-label="Invite a helper"
-            className="grid h-10 w-10 cursor-pointer place-items-center rounded-full text-gp-sub transition-colors hover:bg-gp-hover hover:text-gp-text"
+            className="grid h-9 w-9 cursor-pointer place-items-center rounded-full text-gp-sub transition-colors hover:bg-gp-hover hover:text-gp-text"
           >
-            <Share2 className="h-5 w-5" />
+            <Share2 className="h-4.5 w-4.5" />
           </button>
           <button
             type="button"
             onClick={endSession}
             aria-label="End session"
-            className="grid h-10 w-10 cursor-pointer place-items-center rounded-full text-gp-sub transition-colors hover:bg-gp-hover hover:text-gp-text"
+            className="grid h-9 w-9 cursor-pointer place-items-center rounded-full text-gp-sub transition-colors hover:bg-gp-hover hover:text-gp-text"
           >
-            <X className="h-5 w-5" />
+            <X className="h-4.5 w-4.5" />
           </button>
         </div>
       </header>
 
       {/* Guidance strip + Per-Screen Replay button */}
-      <div className="flex min-h-[74px] shrink-0 items-center gap-3 border-b border-gp-border bg-gp-surface/85 px-3 py-2">
+      <div className="flex min-h-[64px] shrink-0 items-center gap-2.5 border-b border-gp-border bg-gp-surface/85 px-3 py-1.5">
         <span
-          className={`grid h-9 w-9 shrink-0 place-items-center rounded-full text-[14px] font-bold text-white ${
-            localAi ? "bg-emerald-600" : peer ? "bg-volt" : guideRunning ? "bg-laser" : "bg-slate-600"
+          className={`grid h-8.5 w-8.5 shrink-0 place-items-center rounded-full text-[13px] font-bold text-cream ${
+            localAi ? "bg-volt" : peer ? "bg-laser" : guideRunning ? "bg-charcoal ring-1 ring-white/20" : "bg-ink-700"
           }`}
         >
-          {localAi ? <Cpu className="h-4 w-4" /> : peer ? "A" : guideRunning ? <Sparkles className="h-4 w-4" /> : <UserCheck className="h-4 w-4" />}
+          {localAi ? (
+            <Cpu className="h-4 w-4" />
+          ) : peer ? (
+            "A"
+          ) : guideRunning ? (
+            <Sparkles className="h-4 w-4 text-beacon" />
+          ) : (
+            <UserCheck className="h-4 w-4" />
+          )}
         </span>
         <div key={caption?.id ?? stripText} className="gp-rise min-w-0 flex-1" aria-live="polite">
-          <div className="flex flex-wrap items-center gap-2 text-[0.72rem] font-bold uppercase tracking-wide text-gp-muted">
+          <div className="flex flex-wrap items-center gap-1.5 text-[0.7rem] font-bold uppercase tracking-wide text-gp-muted">
             <span className="truncate">{stripFrom}</span>
             {effectivePrivacyShield && (
-              <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/15 px-2 py-0.5 text-[10px] font-bold normal-case tracking-normal text-emerald-600 dark:text-emerald-300">
+              <span className="inline-flex items-center gap-1 rounded-full bg-volt/18 px-2 py-0.5 text-[10px] font-bold normal-case tracking-normal text-gp-sage">
                 {mandatoryShield ? <Lock className="h-3 w-3" /> : <EyeOff className="h-3 w-3" />}
                 {mandatoryShield ? "Mandatory Shield ON" : "Private info hidden"}
               </span>
@@ -611,29 +602,28 @@ export default function HostView({ room }: { room: string }) {
               </button>
             )}
           </div>
-          <p className="line-clamp-2 text-[0.92rem] font-medium leading-snug text-gp-text">{stripText}</p>
+          <p className="line-clamp-2 text-[0.88rem] font-medium leading-snug text-gp-text">{stripText}</p>
         </div>
 
-        {/* Per-Screen Replay: ONLY appears when a replay exists for `state.screen` */}
         {activeScreenReplay && (
           <button
             type="button"
             onClick={triggerReplay}
             disabled={replaying}
             title={`Replay guidance for ${SCREEN_LABEL[state.screen]}`}
-            className="inline-flex h-10 shrink-0 cursor-pointer items-center gap-1.5 rounded-xl bg-laser px-3 text-[0.82rem] font-bold text-white shadow-sm transition-colors hover:bg-orange-600 disabled:opacity-60"
+            className="inline-flex h-9 shrink-0 cursor-pointer items-center gap-1.5 rounded-xl bg-laser px-3 text-[0.8rem] font-bold text-cream shadow-2xs transition-colors hover:bg-laser-dark disabled:opacity-60"
           >
-            <RotateCcw className={`h-4 w-4 ${replaying ? "animate-spin" : ""}`} />
+            <RotateCcw className={`h-3.5 w-3.5 ${replaying ? "animate-spin" : ""}`} />
             Replay
           </button>
         )}
       </div>
 
-      {/* Stage */}
+      {/* Full Framed iPhone Stage (100% visible on mobile & desktop) */}
       <main ref={mainRef} className="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden">
-        {size.w > 0 && (
+        {size.w > 0 && size.h > 0 && (
           <div onPointerDownCapture={onStagePointerDown} style={{ touchAction: "manipulation" }}>
-            <Stage height={H} scale={scale} innerRef={stageRef} framed={!fill}>
+            <Stage height={APP_H} scale={scale} innerRef={stageRef} framed>
               <MockBankApp state={state} onAction={onAction} />
               <MarkerLayer markers={markers} trail={trail} />
               {aiStep?.target && (
@@ -660,14 +650,14 @@ export default function HostView({ room }: { room: string }) {
 
       {verifying && <TrustOverlay />}
 
-      {/* Default Start-of-Session Preferences Popup (automatically blurs helper mirror while open) */}
+      {/* Default Start-of-Session Preferences Popup */}
       {prefsOpen && !verifying && (
         <Sheet onClose={closePreferences}>
           <div className="flex items-center justify-between gap-2">
-            <div className="flex items-center gap-2 text-[0.76rem] font-bold uppercase tracking-wide text-laser">
+            <div className="flex items-center gap-2 text-[0.76rem] font-bold uppercase tracking-wide text-gp-accent">
               <ShieldCheck className="h-4 w-4" /> Your Session Preferences
             </div>
-            <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/15 px-2.5 py-0.5 text-[11px] font-bold text-emerald-500">
+            <span className="inline-flex items-center gap-1 rounded-full bg-volt/18 px-2.5 py-0.5 text-[11px] font-bold text-gp-sage">
               <EyeOff className="h-3 w-3" /> Blurred for helper &amp; AI
             </span>
           </div>
@@ -679,7 +669,7 @@ export default function HostView({ room }: { room: string }) {
           </p>
 
           <div className="mt-4 flex items-start gap-3 rounded-2xl border border-gp-border bg-gp-elevated p-3.5">
-            <span className="mt-0.5 grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-emerald-500/15 text-emerald-500">
+            <span className="mt-0.5 grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-volt/18 text-gp-sage">
               <Lock className="h-4 w-4" />
             </span>
             <div className="flex-1">
@@ -696,7 +686,7 @@ export default function HostView({ room }: { room: string }) {
               aria-label="Mandatory Privacy Shield"
               onClick={toggleMandatoryShield}
               className={`relative mt-1 h-7 w-12 shrink-0 cursor-pointer rounded-full transition-colors duration-200 ${
-                mandatoryShield ? "bg-emerald-500" : "bg-slate-400"
+                mandatoryShield ? "bg-volt" : "bg-ink-600"
               }`}
             >
               <span
@@ -715,7 +705,7 @@ export default function HostView({ room }: { room: string }) {
                 onClick={() => setTheme("dark")}
                 className={`flex h-11 cursor-pointer items-center justify-center gap-2 rounded-xl border text-[0.9rem] font-bold transition-colors ${
                   theme === "dark"
-                    ? "border-laser bg-laser/15 text-gp-text"
+                    ? "border-beacon bg-laser/18 text-gp-text"
                     : "border-gp-border bg-gp-card text-gp-sub hover:bg-gp-hover"
                 }`}
               >
@@ -726,7 +716,7 @@ export default function HostView({ room }: { room: string }) {
                 onClick={() => setTheme("light")}
                 className={`flex h-11 cursor-pointer items-center justify-center gap-2 rounded-xl border text-[0.9rem] font-bold transition-colors ${
                   theme === "light"
-                    ? "border-laser bg-laser/15 text-gp-text"
+                    ? "border-beacon bg-laser/18 text-gp-text"
                     : "border-gp-border bg-gp-card text-gp-sub hover:bg-gp-hover"
                 }`}
               >
@@ -747,7 +737,7 @@ export default function HostView({ room }: { room: string }) {
                     onClick={() => setTextScale(opt.id)}
                     className={`flex h-13 cursor-pointer flex-col items-center justify-center rounded-xl border text-[0.82rem] font-bold transition-colors ${
                       active
-                        ? "border-laser bg-laser/15 text-gp-text"
+                        ? "border-beacon bg-laser/18 text-gp-text"
                         : "border-gp-border bg-gp-card text-gp-sub hover:bg-gp-hover"
                     }`}
                   >
@@ -762,7 +752,7 @@ export default function HostView({ room }: { room: string }) {
           <button
             type="button"
             onClick={closePreferences}
-            className="mt-5 h-12 w-full cursor-pointer rounded-xl bg-laser text-[0.98rem] font-bold text-white shadow-md shadow-laser/25 transition-colors hover:bg-orange-600"
+            className="mt-5 h-12 w-full cursor-pointer rounded-xl bg-laser text-[0.98rem] font-bold text-cream shadow-sm transition-colors hover:bg-laser-dark"
           >
             Save &amp; continue to session
           </button>
@@ -773,10 +763,10 @@ export default function HostView({ room }: { room: string }) {
       {sheet === "request" && (
         <Sheet onClose={() => setSheet(null)}>
           <div className="flex items-center justify-between gap-2">
-            <span className="inline-flex items-center gap-1.5 text-[0.76rem] font-bold uppercase tracking-wide text-volt">
+            <span className="inline-flex items-center gap-1.5 text-[0.76rem] font-bold uppercase tracking-wide text-gp-accent">
               <HelpCircle className="h-4 w-4" /> Specific Help Request
             </span>
-            <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/15 px-2.5 py-0.5 text-[11px] font-bold text-emerald-500">
+            <span className="inline-flex items-center gap-1 rounded-full bg-volt/18 px-2.5 py-0.5 text-[11px] font-bold text-gp-sage">
               <Lock className="h-3 w-3" /> Privacy Shield {effectivePrivacyShield ? "ON" : "Optional"}
             </span>
           </div>
@@ -784,13 +774,12 @@ export default function HostView({ room }: { room: string }) {
             What do you need help with?
           </h2>
 
-          {/* Mode selector: On-Device Local AI vs Human Helper */}
           <div className="mt-3 grid grid-cols-2 gap-2 rounded-xl border border-gp-border bg-gp-elevated p-1">
             <button
               type="button"
               onClick={() => setRequestTab("ai")}
               className={`flex h-10 cursor-pointer items-center justify-center gap-1.5 rounded-lg text-[0.84rem] font-bold transition-colors ${
-                requestTab === "ai" ? "bg-emerald-600 text-white shadow-xs" : "text-gp-sub hover:text-gp-text"
+                requestTab === "ai" ? "bg-volt text-cream shadow-2xs" : "text-gp-sub hover:text-gp-text"
               }`}
             >
               <Cpu className="h-4 w-4" /> Local AI (Instant)
@@ -799,7 +788,7 @@ export default function HostView({ room }: { room: string }) {
               type="button"
               onClick={() => setRequestTab("helper")}
               className={`flex h-10 cursor-pointer items-center justify-center gap-1.5 rounded-lg text-[0.84rem] font-bold transition-colors ${
-                requestTab === "helper" ? "bg-volt text-white shadow-xs" : "text-gp-sub hover:text-gp-text"
+                requestTab === "helper" ? "bg-laser text-cream shadow-2xs" : "text-gp-sub hover:text-gp-text"
               }`}
             >
               <UserCheck className="h-4 w-4" /> {peer ? `Ask ${HELPER_SHORT}` : "Ask Helper"}
@@ -808,9 +797,9 @@ export default function HostView({ room }: { room: string }) {
 
           {requestTab === "ai" ? (
             <div className="mt-3">
-              <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-3 text-[12px] font-medium leading-relaxed text-gp-sub">
-                <div className="font-bold text-emerald-600 dark:text-emerald-300">
-                  100% On-Device Local AI Algorithm (Zero Cloud Servers)
+              <div className="rounded-xl border border-volt/35 bg-volt/12 p-3 text-[12px] font-medium leading-relaxed text-gp-sub">
+                <div className="font-bold text-gp-sage">
+                  100% On-Device Local AI &amp; Offline Help (Zero Cloud Servers)
                 </div>
                 Runs strictly inside your browser and receives the exact same Privacy Shield masking as a human helper:
                 <div className="mt-1.5 rounded-lg bg-gp-bg/80 px-2.5 py-1 font-mono text-[11px] font-semibold text-gp-muted">
@@ -828,7 +817,7 @@ export default function HostView({ room }: { room: string }) {
                     key={s}
                     type="button"
                     onClick={() => launchLocalAiRequest(s)}
-                    className="cursor-pointer rounded-full border border-gp-border bg-gp-card px-3 py-1.5 text-[12px] font-semibold text-gp-sub transition-colors hover:border-emerald-500 hover:bg-gp-hover hover:text-gp-text"
+                    className="cursor-pointer rounded-full border border-gp-border bg-gp-card px-3 py-1.5 text-[12px] font-semibold text-gp-sub transition-colors hover:border-volt hover:bg-gp-hover hover:text-gp-text"
                   >
                     {s}
                   </button>
@@ -848,7 +837,7 @@ export default function HostView({ room }: { room: string }) {
                     key={q}
                     type="button"
                     onClick={() => sendHelperRequest(q)}
-                    className="cursor-pointer rounded-full border border-gp-border bg-gp-card px-3 py-1.5 text-[12px] font-semibold text-gp-sub transition-colors hover:border-volt hover:bg-gp-hover hover:text-gp-text"
+                    className="cursor-pointer rounded-full border border-gp-border bg-gp-card px-3 py-1.5 text-[12px] font-semibold text-gp-sub transition-colors hover:border-beacon hover:bg-gp-hover hover:text-gp-text"
                   >
                     {q}
                   </button>
@@ -871,13 +860,13 @@ export default function HostView({ room }: { room: string }) {
                   ? "Type what you want to do, e.g. Send $250 to David..."
                   : "Type a specific question for your helper..."
               }
-              className="h-11 min-w-0 flex-1 rounded-xl border border-gp-border bg-gp-bg px-3.5 text-[0.92rem] font-medium text-gp-text placeholder:text-gp-muted focus:outline-none focus:ring-2 focus:ring-laser"
+              className="h-11 min-w-0 flex-1 rounded-xl border border-gp-border bg-gp-bg px-3.5 text-[0.92rem] font-medium text-gp-text placeholder:text-gp-muted focus:outline-none focus:ring-2 focus:ring-beacon"
             />
             <button
               type="submit"
               disabled={!requestInput.trim()}
-              className={`inline-flex h-11 shrink-0 cursor-pointer items-center gap-1.5 rounded-xl px-4 text-[0.9rem] font-bold text-white transition-colors disabled:cursor-not-allowed disabled:opacity-45 ${
-                requestTab === "ai" ? "bg-emerald-600 hover:bg-emerald-500" : "bg-volt hover:bg-violet-600"
+              className={`inline-flex h-11 shrink-0 cursor-pointer items-center gap-1.5 rounded-xl px-4 text-[0.9rem] font-bold text-cream transition-colors disabled:cursor-not-allowed disabled:opacity-45 ${
+                requestTab === "ai" ? "bg-volt hover:bg-volt-dark" : "bg-laser hover:bg-laser-dark"
               }`}
             >
               <Send className="h-4 w-4" /> {requestTab === "ai" ? "Guide me" : "Send"}
@@ -888,7 +877,7 @@ export default function HostView({ room }: { room: string }) {
 
       {guide === "offer" && !peer && !prefsOpen && !localAi && sheet === null && (
         <Sheet onClose={() => setGuide("idle")}>
-          <div className="flex items-center gap-2 text-[0.78rem] font-bold uppercase tracking-wide text-laser">
+          <div className="flex items-center gap-2 text-[0.78rem] font-bold uppercase tracking-wide text-gp-accent">
             <Sparkles className="h-4 w-4" /> No helper connected yet
           </div>
           <h2 className="mt-1 text-[1.25rem] font-extrabold tracking-tight text-gp-text">
@@ -902,7 +891,7 @@ export default function HostView({ room }: { room: string }) {
             <button
               type="button"
               onClick={() => setGuide("running")}
-              className="h-12 cursor-pointer rounded-xl bg-laser text-[0.96rem] font-bold text-white transition-colors hover:bg-orange-600"
+              className="h-12 cursor-pointer rounded-xl bg-laser text-[0.96rem] font-bold text-cream transition-colors hover:bg-laser-dark"
             >
               Start 60-second demo ({Math.max(countdown, 0)})
             </button>
@@ -913,7 +902,7 @@ export default function HostView({ room }: { room: string }) {
                 setRequestTab("ai");
                 setSheet("request");
               }}
-              className="flex h-12 cursor-pointer items-center justify-center gap-2 rounded-xl bg-emerald-600 text-[0.96rem] font-bold text-white transition-colors hover:bg-emerald-500"
+              className="flex h-12 cursor-pointer items-center justify-center gap-2 rounded-xl bg-volt text-[0.96rem] font-bold text-cream transition-colors hover:bg-volt-dark"
             >
               <Cpu className="h-4 w-4" /> Ask On-Device Local AI
             </button>
@@ -933,7 +922,7 @@ export default function HostView({ room }: { room: string }) {
 
       {guideDone && !peer && !prefsOpen && (
         <Sheet onClose={() => setGuide("idle")}>
-          <div className="flex items-center gap-2 text-[0.78rem] font-bold uppercase tracking-wide text-emerald-500">
+          <div className="flex items-center gap-2 text-[0.78rem] font-bold uppercase tracking-wide text-gp-sage">
             <ShieldCheck className="h-4 w-4" /> Demo complete
           </div>
           <h2 className="mt-1 text-[1.25rem] font-extrabold tracking-tight text-gp-text">
@@ -941,13 +930,13 @@ export default function HostView({ room }: { room: string }) {
           </h2>
           <ul className="mt-3 space-y-2 text-[0.92rem] font-medium text-gp-sub">
             <li className="flex gap-2">
-              <Ban className="mt-0.5 h-4 w-4 shrink-0 text-laser" /> Remote control: Blocked (0 remote taps possible)
+              <Ban className="mt-0.5 h-4 w-4 shrink-0 text-gp-accent" /> Remote control: Blocked (0 remote taps possible)
             </li>
             <li className="flex gap-2">
-              <EyeOff className="mt-0.5 h-4 w-4 shrink-0 text-laser" /> Balance &amp; code hidden from helper and AI
+              <EyeOff className="mt-0.5 h-4 w-4 shrink-0 text-gp-accent" /> Balance &amp; code hidden from helper and AI
             </li>
             <li className="flex gap-2">
-              <KeyRound className="mt-0.5 h-4 w-4 shrink-0 text-laser" /> Only pre-paired devices can connect
+              <KeyRound className="mt-0.5 h-4 w-4 shrink-0 text-gp-accent" /> Only pre-paired devices can connect
             </li>
           </ul>
           <div className="mt-4 grid grid-cols-2 gap-2">
@@ -965,7 +954,7 @@ export default function HostView({ room }: { room: string }) {
                 setRequestTab("ai");
                 setSheet("request");
               }}
-              className="h-12 cursor-pointer rounded-xl bg-emerald-600 text-[0.95rem] font-bold text-white transition-colors hover:bg-emerald-500"
+              className="h-12 cursor-pointer rounded-xl bg-volt text-[0.95rem] font-bold text-cream transition-colors hover:bg-volt-dark"
             >
               Ask Local AI
             </button>
@@ -975,7 +964,7 @@ export default function HostView({ room }: { room: string }) {
 
       {sheet === "invite" && (
         <Sheet onClose={() => setSheet(null)}>
-          <div className="flex items-center gap-2 text-[0.78rem] font-bold uppercase tracking-wide text-volt">
+          <div className="flex items-center gap-2 text-[0.78rem] font-bold uppercase tracking-wide text-gp-accent">
             <Laptop className="h-4 w-4" /> Invite your trusted helper
           </div>
           <h2 className="mt-1 text-[1.25rem] font-extrabold tracking-tight text-gp-text">
@@ -1000,7 +989,7 @@ export default function HostView({ room }: { room: string }) {
             <button
               type="button"
               onClick={shareLink}
-              className="flex h-12 cursor-pointer items-center justify-center gap-2 rounded-xl bg-volt text-[0.95rem] font-bold text-white transition-colors hover:bg-violet-600"
+              className="flex h-12 cursor-pointer items-center justify-center gap-2 rounded-xl bg-laser text-[0.95rem] font-bold text-cream transition-colors hover:bg-laser-dark"
             >
               <Share2 className="h-4 w-4" /> Share
             </button>
@@ -1010,7 +999,7 @@ export default function HostView({ room }: { room: string }) {
 
       {ended && (
         <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-gp-bg/95 px-6 text-center backdrop-blur">
-          <span className="grid h-16 w-16 place-items-center rounded-full bg-emerald-500/15 text-emerald-500">
+          <span className="grid h-16 w-16 place-items-center rounded-full bg-volt/18 text-gp-sage">
             <ShieldCheck className="h-8 w-8" />
           </span>
           <h2 className="mt-4 text-[1.4rem] font-extrabold tracking-tight text-gp-text">
@@ -1026,7 +1015,7 @@ export default function HostView({ room }: { room: string }) {
           </dl>
           <Link
             href="/"
-            className="mt-6 inline-flex h-12 items-center rounded-xl bg-laser px-6 text-[0.96rem] font-bold text-white transition-colors hover:bg-orange-600"
+            className="mt-6 inline-flex h-12 items-center rounded-xl bg-laser px-6 text-[0.96rem] font-bold text-cream transition-colors hover:bg-laser-dark"
           >
             Start a new session
           </Link>
@@ -1048,25 +1037,28 @@ function Row({ k, v }: { k: string; v: string }) {
 function StatusPill({ peer, guide, localAi }: { peer: boolean; guide: boolean; localAi: boolean }) {
   if (peer)
     return (
-      <span className="ml-1 hidden items-center gap-1.5 rounded-full bg-emerald-500/15 px-2.5 py-1 text-[12px] font-bold text-emerald-600 sm:inline-flex dark:text-emerald-300">
-        <span className="h-2 w-2 rounded-full bg-emerald-500" /> {HELPER_SHORT} connected
+      <span className="ml-1 inline-flex items-center gap-1.5 rounded-full bg-volt/18 px-2 py-0.5 text-[11px] font-bold text-gp-sage">
+        <span className="h-2 w-2 rounded-full bg-volt" />
+        <span className="hidden xs:inline sm:inline">{HELPER_SHORT}</span>
       </span>
     );
   if (localAi)
     return (
-      <span className="ml-1 hidden items-center gap-1.5 rounded-full bg-emerald-500/15 px-2.5 py-1 text-[12px] font-bold text-emerald-600 sm:inline-flex dark:text-emerald-300">
-        <Cpu className="h-3.5 w-3.5" /> Local AI active
+      <span className="ml-1 inline-flex items-center gap-1.5 rounded-full bg-volt/18 px-2 py-0.5 text-[11px] font-bold text-gp-sage">
+        <Cpu className="h-3 w-3" />
+        <span className="hidden sm:inline">Local AI</span>
       </span>
     );
   if (guide)
     return (
-      <span className="ml-1 hidden items-center gap-1.5 rounded-full bg-laser/15 px-2.5 py-1 text-[12px] font-bold text-laser sm:inline-flex">
-        <Sparkles className="h-3 w-3" /> Guided demo
+      <span className="ml-1 inline-flex items-center gap-1.5 rounded-full bg-laser/18 px-2 py-0.5 text-[11px] font-bold text-gp-accent">
+        <Sparkles className="h-3 w-3" />
+        <span className="hidden sm:inline">Demo</span>
       </span>
     );
   return (
-    <span className="ml-1 hidden items-center gap-1.5 rounded-full border border-gp-border bg-gp-card px-2.5 py-1 text-[12px] font-bold text-gp-sub sm:inline-flex">
-      <span className="gp-pulse-dot h-2 w-2 rounded-full bg-amber-500" /> Waiting
+    <span className="ml-1 hidden items-center gap-1.5 rounded-full border border-gp-border bg-gp-card px-2.5 py-0.5 text-[11px] font-bold text-gp-sub sm:inline-flex">
+      <span className="gp-pulse-dot h-2 w-2 rounded-full bg-beacon" /> Waiting
     </span>
   );
 }
@@ -1101,8 +1093,8 @@ function TrustOverlay() {
   return (
     <div className="gp-overlay-out absolute inset-0 z-50 flex flex-col items-center justify-center bg-gp-bg px-8 text-gp-text">
       <span className="relative grid h-20 w-20 place-items-center">
-        <span className="gp-ring absolute inset-0 rounded-full border-2 border-laser" />
-        <span className="grid h-16 w-16 place-items-center rounded-full bg-laser/15 text-laser">
+        <span className="gp-ring absolute inset-0 rounded-full border-2 border-beacon" />
+        <span className="grid h-16 w-16 place-items-center rounded-full bg-laser/18 text-gp-accent">
           <ShieldCheck className="h-8 w-8" />
         </span>
       </span>
@@ -1114,7 +1106,7 @@ function TrustOverlay() {
             <Icon className="h-4 w-4 shrink-0 text-gp-muted" />
             <span className="flex-1">{text}</span>
             <span
-              className="gp-check-in grid h-5 w-5 place-items-center rounded-full bg-emerald-500 text-white"
+              className="gp-check-in grid h-5 w-5 place-items-center rounded-full bg-volt text-cream"
               style={{ animationDelay: `${delay}s` }}
             >
               <Check className="h-3 w-3" strokeWidth={3} />

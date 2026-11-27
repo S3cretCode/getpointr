@@ -2,30 +2,34 @@
 
 :root,
 [data-theme="dark"] {
-  --gp-bg: #070b14;
-  --gp-surface: #0e1628;
-  --gp-card: #152038;
-  --gp-elevated: #1c2a48;
-  --gp-border: rgba(255, 255, 255, 0.16);
-  --gp-hover: rgba(255, 255, 255, 0.09);
-  --gp-text: #ffffff;
-  --gp-sub: #e2e8f0;
-  --gp-muted: #b6c2d6;
-  --gp-backdrop: rgba(3, 6, 14, 0.72);
+  --gp-bg: #181c22;
+  --gp-surface: #21262e;
+  --gp-card: #282e38;
+  --gp-elevated: #313844;
+  --gp-border: rgba(246, 245, 240, 0.14);
+  --gp-hover: rgba(246, 245, 240, 0.08);
+  --gp-text: #f6f5f0;
+  --gp-sub: #dce1e8;
+  --gp-muted: #a6b1c0;
+  --gp-accent-text: #8bb4d9;
+  --gp-sage-text: #84b5a1;
+  --gp-backdrop: rgba(15, 18, 23, 0.74);
   color-scheme: dark;
 }
 
 [data-theme="light"] {
-  --gp-bg: #f4f7fb;
-  --gp-surface: #ffffff;
+  --gp-bg: #f6f5f0;
+  --gp-surface: #fdfcf9;
   --gp-card: #ffffff;
-  --gp-elevated: #eef2f8;
-  --gp-border: #cbd5e1;
-  --gp-hover: #e2e8f0;
-  --gp-text: #0b1220;
-  --gp-sub: #1e293b;
-  --gp-muted: #475569;
-  --gp-backdrop: rgba(15, 23, 42, 0.48);
+  --gp-elevated: #eceae2;
+  --gp-border: #d4d2c8;
+  --gp-hover: #e4e2d9;
+  --gp-text: #20252c;
+  --gp-sub: #373f4a;
+  --gp-muted: #5c6673;
+  --gp-accent-text: #3e6b94;
+  --gp-sage-text: #457361;
+  --gp-backdrop: rgba(24, 28, 34, 0.48);
   color-scheme: light;
 }
 
@@ -40,11 +44,11 @@ html[data-text-scale="xl"] {
 }
 
 @theme {
-  --color-ink-950: #070b14;
-  --color-ink-900: #0e1628;
-  --color-ink-800: #152038;
-  --color-ink-700: #1c2a48;
-  --color-ink-600: #2a3b60;
+  --color-ink-950: #181c22;
+  --color-ink-900: #21262e;
+  --color-ink-800: #282e38;
+  --color-ink-700: #313844;
+  --color-ink-600: #414a59;
   --color-gp-bg: var(--gp-bg);
   --color-gp-surface: var(--gp-surface);
   --color-gp-card: var(--gp-card);
@@ -54,8 +58,15 @@ html[data-text-scale="xl"] {
   --color-gp-text: var(--gp-text);
   --color-gp-sub: var(--gp-sub);
   --color-gp-muted: var(--gp-muted);
-  --color-laser: #ff6414;
-  --color-volt: #7c3aed;
+  --color-gp-accent: var(--gp-accent-text);
+  --color-gp-sage: var(--gp-sage-text);
+  --color-laser: #5584b0;
+  --color-laser-dark: #457099;
+  --color-beacon: #78a3c8;
+  --color-volt: #598775;
+  --color-volt-dark: #487161;
+  --color-charcoal: #232830;
+  --color-cream: #f6f5f0;
   --font-sans: var(--font-jakarta), ui-sans-serif, system-ui, -apple-system, sans-serif;
   --font-mono: var(--font-jetbrains), ui-monospace, SFMono-Regular, monospace;
 }
@@ -80,14 +91,14 @@ a,
 }
 
 :focus-visible {
-  outline: 2px solid var(--color-laser);
+  outline: 2px solid var(--color-beacon);
   outline-offset: 2px;
 }
 
 /* ---------- Pointer + UI motion ---------- */
 @keyframes gp-ring {
   0% { transform: scale(0.35); opacity: 0.95; }
-  80% { opacity: 0.2; }
+  80% { opacity: 0.22; }
   100% { transform: scale(1.65); opacity: 0; }
 }
 .gp-ring { animation: gp-ring 1.75s cubic-bezier(0.2, 0.7, 0.3, 1) infinite; }
@@ -113,7 +124,7 @@ a,
 }
 .gp-done { animation: gp-done 1.2s ease-out both; }
 
-/* Noticeable owner tap ripple: bright electric-blue double wave + center flash */
+/* Noticeable owner tap ripple in muted sage green */
 @keyframes gp-tap-outer {
   0% { transform: scale(0.2); opacity: 1; }
   70% { opacity: 0.65; }
@@ -169,7 +180,7 @@ a,
 }
 .gp-float { animation: gp-float 4.5s ease-in-out infinite; }
 
-.gp-glow { box-shadow: 0 0 0 4px #fff, 0 0 24px 8px rgba(255, 100, 20, 0.6); }
+.gp-glow { box-shadow: 0 0 0 4px #ffffff, 0 0 24px 8px rgba(85, 132, 176, 0.62); }
 
 @media (prefers-reduced-motion: reduce) {
   .gp-ring { animation: none; opacity: 0.65; transform: scale(1); }

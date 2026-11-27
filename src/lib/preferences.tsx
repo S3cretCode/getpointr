@@ -143,7 +143,11 @@ export function AppearanceBar({ compact = false }: { compact?: boolean }) {
         aria-label={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
         className="inline-flex h-7 cursor-pointer items-center gap-1.5 rounded-lg px-2 text-[12px] font-semibold text-gp-sub transition-colors hover:bg-gp-hover hover:text-gp-text"
       >
-        {theme === "dark" ? <Sun className="h-3.5 w-3.5 text-amber-400" /> : <Moon className="h-3.5 w-3.5 text-indigo-600" />}
+        {theme === "dark" ? (
+          <Sun className="h-3.5 w-3.5 text-gp-accent" />
+        ) : (
+          <Moon className="h-3.5 w-3.5 text-gp-accent" />
+        )}
         {!compact && <span>{theme === "dark" ? "Light" : "Dark"}</span>}
       </button>
     </div>

@@ -30,7 +30,7 @@ import {
   X,
 } from "lucide-react";
 import MockBankApp, { ShieldContext } from "./MockBankApp";
-import { Stage, W, FRAME_PAD, IPHONE_CHROME_H } from "./Stage";
+import { Stage, W, fitStageScale } from "./Stage";
 import { MarkerLayer, type TapRipple } from "./Markers";
 import { Logo } from "./Logo";
 import { AppearanceBar } from "@/lib/preferences";
@@ -70,7 +70,7 @@ export default function HelperView({ room }: { room: string }) {
 
   const [hostState, setHostState] = useState<AppState>(INITIAL_STATE);
   const hostStateRef = useRef(hostState);
-  const [hostH, setHostH] = useState(740);
+  const [hostH, setHostH] = useState(710);
   const [markers, setMarkers] = useState<Marker[]>([]);
   const markersRef = useRef<Marker[]>([]);
   const [tool, setTool] = useState<Tool>("ring");
@@ -99,17 +99,9 @@ export default function HelperView({ room }: { room: string }) {
   const [mainRef, size] = useElementSize<HTMLDivElement>();
 
   const safeHostH = Math.max(700, hostH);
+  const reservedVert = activeRequest ? 124 : 76;
   const scale =
-    size.w > 0 && size.h > 0
-      ? Math.max(
-          0.32,
-          Math.min(
-            (size.w - 32 - FRAME_PAD * 2) / W,
-            (size.h - 88 - FRAME_PAD * 2) / (safeHostH + IPHONE_CHROME_H),
-            1.06,
-          ),
-        )
-      : 0.72;
+    size.w > 0 && size.h > 0 ? fitStageScale(size.w - 24, size.h - reservedVert, safeHostH, 1.04) : 0.68;
 
   const addLog = (text: string) => {
     logId.current += 1;
@@ -365,12 +357,10 @@ export default function HelperView({ room }: { room: string }) {
         </span>
         <span
           className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[12px] font-bold ${
-            peer
-              ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-300"
-              : "border border-gp-border bg-gp-card text-gp-sub"
+            peer ? "bg-volt/18 text-gp-sage" : "border border-gp-border bg-gp-card text-gp-sub"
           }`}
         >
-          <span className={`h-2 w-2 rounded-full ${peer ? "bg-emerald-500" : "gp-pulse-dot bg-amber-500"}`} />
+          <span className={`h-2 w-2 rounded-full ${peer ? "bg-volt" : "gp-pulse-dot bg-beacon"}`} />
           {peer ? "Phone connected" : status === "error" ? "Connection error" : "Waiting for phone"}
         </span>
         <div className="ml-auto flex items-center gap-2.5">
@@ -383,7 +373,7 @@ export default function HelperView({ room }: { room: string }) {
           <button
             type="button"
             onClick={endSession}
-            className="h-9 cursor-pointer rounded-lg border border-gp-border bg-gp-card px-3 text-[13px] font-bold text-gp-text transition-colors hover:border-rose-500 hover:bg-rose-500 hover:text-white"
+            className="h-9 cursor-pointer rounded-lg border border-gp-border bg-gp-card px-3 text-[13px] font-bold text-gp-text transition-colors hover:bg-charcoal hover:text-cream"
           >
             End session
           </button>
@@ -391,22 +381,26 @@ export default function HelperView({ room }: { room: string }) {
       </header>
 
       <div className="flex min-h-0 flex-1 flex-col lg:flex-row">
-        {/* Mirror */}
-        <main ref={mainRef} className="relative flex min-h-[480px] flex-1 flex-col items-center justify-center p-4 sm:min-h-[580px] sm:p-6 lg:min-h-0">
+        {/* Mirror: bounded height on mobile so the full framed iPhone fits cleanly above the controls */}
+        <main
+          ref={mainRef}
+          className={`relative flex flex-1 flex-col items-center justify-center p-3 sm:p-5 ${
+            peer ? "h-[64dvh] min-h-[430px] lg:h-auto lg:min-h-0" : "min-h-[480px] lg:min-h-0"
+          }`}
+        >
           {peer ? (
             <>
-              {/* Incoming Help Request Banner from Phone Owner */}
               {activeRequest && (
                 <div
                   key={activeRequest.id}
-                  className="gp-drop mb-3 flex w-full max-w-md items-center gap-3 rounded-2xl border border-volt bg-volt/15 px-4 py-2.5 shadow-lg"
+                  className="gp-drop mb-2 flex w-full max-w-md items-center gap-3 rounded-2xl border border-beacon bg-laser/15 px-3.5 py-2 shadow-md"
                 >
-                  <HelpCircle className="h-5 w-5 shrink-0 text-volt" />
+                  <HelpCircle className="h-5 w-5 shrink-0 text-gp-accent" />
                   <div className="min-w-0 flex-1">
-                    <div className="text-[11px] font-bold uppercase tracking-wider text-volt">
+                    <div className="text-[11px] font-bold uppercase tracking-wider text-gp-accent">
                       Request from {OWNER_NAME}
                     </div>
-                    <p className="truncate text-[0.9rem] font-bold text-gp-text">“{activeRequest.text}”</p>
+                    <p className="truncate text-[0.88rem] font-bold text-gp-text">“{activeRequest.text}”</p>
                   </div>
                   <button
                     type="button"
@@ -419,30 +413,29 @@ export default function HelperView({ room }: { room: string }) {
                 </div>
               )}
 
-              <div className="mb-3 flex flex-wrap items-center justify-center gap-2 text-[0.86rem] font-semibold text-gp-sub">
-                <Eye className="h-4 w-4 text-laser" />
-                Live view of {OWNER_NAME}&apos;s phone ·{" "}
-                <span className="font-bold text-gp-text">{SCREEN_LABEL[hostState.screen]}</span>
-                <span className="rounded-full border border-gp-border bg-gp-card px-2.5 py-0.5 text-[11px] font-bold">
-                  View-only (point, never tap)
+              <div className="mb-2 flex flex-wrap items-center justify-center gap-2 text-[0.82rem] font-semibold text-gp-sub">
+                <Eye className="h-4 w-4 text-gp-accent" />
+                {OWNER_NAME}&apos;s iPhone · <span className="font-bold text-gp-text">{SCREEN_LABEL[hostState.screen]}</span>
+                <span className="rounded-full border border-gp-border bg-gp-card px-2 py-0.5 text-[11px] font-bold">
+                  View-only
                 </span>
               </div>
+
               <Stage height={safeHostH} scale={scale} innerRef={stageRef} framed>
                 <ShieldContext.Provider value={effectiveShield}>
                   <MockBankApp state={hostState} />
                 </ShieldContext.Provider>
                 <MarkerLayer markers={markers} trail={trail} taps={taps} />
 
-                {/* Automatic blur veil when phone owner has Session Preferences open */}
                 {hostPrefsOpen && (
-                  <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-slate-950/75 px-8 text-center text-white backdrop-blur-xl">
-                    <span className="grid h-14 w-14 place-items-center rounded-2xl bg-laser/20 text-laser ring-1 ring-white/20">
+                  <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-[#181C22]/82 px-8 text-center text-[#F6F5F0] backdrop-blur-xl">
+                    <span className="grid h-14 w-14 place-items-center rounded-2xl bg-laser/20 text-beacon ring-1 ring-white/20">
                       <SlidersHorizontal className="h-7 w-7" />
                     </span>
                     <h3 className="mt-4 text-[18px] font-extrabold tracking-tight">
                       {OWNER_NAME} is setting session preferences
                     </h3>
-                    <p className="mt-1.5 text-[13px] font-medium leading-relaxed text-slate-200">
+                    <p className="mt-1.5 text-[13px] font-medium leading-relaxed text-[#DCE1E8]">
                       Screen is automatically blurred while {OWNER_NAME} selects privacy and accessibility options.
                     </p>
                   </div>
@@ -458,8 +451,9 @@ export default function HelperView({ room }: { room: string }) {
                   aria-label="Click to point, drag for a live laser"
                 />
               </Stage>
-              <p className="mt-3 text-center text-[0.8rem] font-medium text-gp-muted">
-                Click to place a pointer · drag for a live laser · bright blue ripples show where {OWNER_NAME} taps
+
+              <p className="mt-2 text-center text-[0.78rem] font-medium text-gp-muted">
+                Click to point · drag for a live laser · green ripples show where {OWNER_NAME} taps
               </p>
             </>
           ) : (
@@ -479,7 +473,7 @@ export default function HelperView({ room }: { room: string }) {
         <aside className="w-full shrink-0 space-y-4 overflow-y-auto border-t border-gp-border bg-gp-surface/75 p-4 sm:p-5 lg:w-[376px] lg:border-l lg:border-t-0">
           <Card>
             <div className="flex items-center gap-2">
-              <ShieldCheck className={`h-5 w-5 ${peer ? "text-emerald-500" : "text-gp-muted"}`} />
+              <ShieldCheck className={`h-5 w-5 ${peer ? "text-gp-sage" : "text-gp-muted"}`} />
               <h2 className="text-[0.92rem] font-bold text-gp-text">
                 {peer ? "Trusted Circle verified" : "Awaiting paired device"}
               </h2>
@@ -489,13 +483,13 @@ export default function HelperView({ room }: { room: string }) {
             </div>
             <ul className="mt-3 space-y-1.5 text-[0.84rem] font-medium text-gp-sub">
               <li className="flex items-center gap-2">
-                <Ban className="h-4 w-4 shrink-0 text-laser" /> Remote taps disabled (visual pointers only)
+                <Ban className="h-4 w-4 shrink-0 text-gp-accent" /> Remote taps disabled (visual pointers only)
               </li>
               <li className="flex items-center gap-2">
-                <Database className="h-4 w-4 shrink-0 text-laser" /> Screen data stored: none
+                <Database className="h-4 w-4 shrink-0 text-gp-accent" /> Screen data stored: none
               </li>
               <li className="flex items-center gap-2">
-                <Radio className="h-4 w-4 shrink-0 text-laser" />
+                <Radio className="h-4 w-4 shrink-0 text-gp-accent" />
                 {mode === "supabase" ? "Realtime: encrypted (TLS) · metadata only" : "Local demo channel (same browser)"}
               </li>
             </ul>
@@ -513,7 +507,7 @@ export default function HelperView({ room }: { room: string }) {
                   onClick={() => setTool(id)}
                   className={`relative flex h-16 cursor-pointer flex-col items-center justify-center gap-1 rounded-xl border text-[12px] font-bold transition-colors ${
                     tool === id
-                      ? "border-laser bg-laser/15 text-gp-text"
+                      ? "border-beacon bg-laser/18 text-gp-text"
                       : "border-gp-border bg-gp-elevated text-gp-sub hover:bg-gp-hover"
                   }`}
                 >
@@ -568,13 +562,13 @@ export default function HelperView({ room }: { room: string }) {
                 onChange={(e) => setMsg(e.target.value)}
                 maxLength={140}
                 placeholder="Type a short instruction..."
-                className="h-10 min-w-0 flex-1 rounded-lg border border-gp-border bg-gp-bg px-3 text-[14px] font-medium text-gp-text placeholder:text-gp-muted focus:outline-none focus:ring-2 focus:ring-laser"
+                className="h-10 min-w-0 flex-1 rounded-lg border border-gp-border bg-gp-bg px-3 text-[14px] font-medium text-gp-text placeholder:text-gp-muted focus:outline-none focus:ring-2 focus:ring-beacon"
               />
               <button
                 type="submit"
                 disabled={!peer || !msg.trim()}
                 aria-label="Send message"
-                className="grid h-10 w-10 cursor-pointer place-items-center rounded-lg bg-volt text-white transition-colors hover:bg-violet-600 disabled:cursor-not-allowed disabled:opacity-40"
+                className="grid h-10 w-10 cursor-pointer place-items-center rounded-lg bg-laser text-cream transition-colors hover:bg-laser-dark disabled:cursor-not-allowed disabled:opacity-40"
               >
                 <Send className="h-4 w-4" />
               </button>
@@ -586,15 +580,15 @@ export default function HelperView({ room }: { room: string }) {
               <div className="flex-1">
                 <div className="flex flex-wrap items-center gap-2 text-[0.92rem] font-bold text-gp-text">
                   {effectiveShield ? (
-                    <EyeOff className="h-4 w-4 text-emerald-500" />
+                    <EyeOff className="h-4 w-4 text-gp-sage" />
                   ) : (
-                    <Eye className="h-4 w-4 text-amber-500" />
+                    <Eye className="h-4 w-4 text-gp-accent" />
                   )}
                   Privacy Shield
                   {!mandatoryShield && <kbd className="font-mono text-[10px] text-gp-muted">S</kbd>}
                 </div>
                 {mandatoryShield ? (
-                  <p className="mt-1 flex items-center gap-1.5 text-[12px] font-bold text-emerald-600 dark:text-emerald-400">
+                  <p className="mt-1 flex items-center gap-1.5 text-[12px] font-bold text-gp-sage">
                     <Lock className="h-3.5 w-3.5 shrink-0" /> Locked ON by {OWNER_NAME} (Mandatory)
                   </p>
                 ) : null}
@@ -614,11 +608,11 @@ export default function HelperView({ room }: { room: string }) {
                 onClick={toggleShield}
                 title={mandatoryShield ? `Locked ON by ${OWNER_NAME}` : "Toggle Privacy Shield"}
                 className={`relative mt-0.5 h-7 w-12 shrink-0 rounded-full transition-colors duration-200 ${
-                  effectiveShield ? "bg-emerald-500" : "bg-slate-400"
-                } ${mandatoryShield ? "cursor-not-allowed opacity-80" : "cursor-pointer"}`}
+                  effectiveShield ? "bg-volt" : "bg-ink-600"
+                } ${mandatoryShield ? "cursor-not-allowed opacity-85" : "cursor-pointer"}`}
               >
                 <span
-                  className={`absolute left-0 top-0.5 grid h-6 w-6 place-items-center rounded-full bg-white text-emerald-700 shadow transition-transform duration-200 ${
+                  className={`absolute left-0 top-0.5 grid h-6 w-6 place-items-center rounded-full bg-white text-charcoal shadow transition-transform duration-200 ${
                     effectiveShield ? "translate-x-[22px]" : "translate-x-0.5"
                   }`}
                 >
@@ -655,7 +649,7 @@ export default function HelperView({ room }: { room: string }) {
           style={{ background: "var(--gp-backdrop)" }}
         >
           <div className="w-full max-w-sm rounded-3xl border border-gp-border bg-gp-surface p-6 text-center shadow-2xl">
-            <span className="mx-auto grid h-14 w-14 place-items-center rounded-full bg-emerald-500/15 text-emerald-500">
+            <span className="mx-auto grid h-14 w-14 place-items-center rounded-full bg-volt/18 text-gp-sage">
               <ShieldCheck className="h-7 w-7" />
             </span>
             <h2 className="mt-4 text-[1.25rem] font-extrabold text-gp-text">
@@ -667,7 +661,7 @@ export default function HelperView({ room }: { room: string }) {
             <div className="mt-5 grid gap-2">
               <Link
                 href="/"
-                className="inline-flex h-11 items-center justify-center rounded-xl bg-laser text-[14px] font-bold text-white transition-colors hover:bg-orange-600"
+                className="inline-flex h-11 items-center justify-center rounded-xl bg-laser text-[14px] font-bold text-cream transition-colors hover:bg-laser-dark"
               >
                 Start a new session
               </Link>
@@ -705,15 +699,15 @@ function WaitingPanel({
 }) {
   return (
     <div className="flex w-full max-w-3xl flex-col items-center gap-8 md:flex-row md:items-center">
-      <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-2xl shadow-laser/10">
+      <div className="rounded-3xl border border-[#D4D2C8] bg-[#FDFCF9] p-5 shadow-2xl">
         {phoneUrl ? (
-          <QRCodeSVG value={phoneUrl} size={232} level="M" marginSize={0} fgColor="#0B1120" />
+          <QRCodeSVG value={phoneUrl} size={232} level="M" marginSize={0} fgColor="#232830" bgColor="#FDFCF9" />
         ) : (
-          <div className="h-[232px] w-[232px] animate-pulse rounded-xl bg-slate-200" />
+          <div className="h-[232px] w-[232px] animate-pulse rounded-xl bg-gp-elevated" />
         )}
       </div>
       <div className="flex-1 text-center md:text-left">
-        <div className="inline-flex items-center gap-2 rounded-full bg-laser/15 px-3 py-1 text-[12px] font-bold text-laser">
+        <div className="inline-flex items-center gap-2 rounded-full bg-laser/15 px-3 py-1 text-[12px] font-bold text-gp-accent">
           <Smartphone className="h-3.5 w-3.5" />{" "}
           {reconnecting ? "Phone disconnected: waiting to reconnect" : "Step 1 of 2"}
         </div>
@@ -731,7 +725,7 @@ function WaitingPanel({
             href={phoneUrl || "#"}
             target="_blank"
             rel="noreferrer"
-            className="inline-flex h-12 items-center gap-2 rounded-xl bg-laser px-5 text-[0.96rem] font-extrabold text-white shadow-lg shadow-laser/30 transition-colors hover:bg-orange-600"
+            className="inline-flex h-12 items-center gap-2 rounded-xl bg-laser px-5 text-[0.96rem] font-extrabold text-cream shadow-md transition-colors hover:bg-laser-dark"
           >
             Open phone view in a new tab <ArrowUpRight className="h-5 w-5 stroke-[2.6]" />
           </a>
@@ -751,7 +745,7 @@ function WaitingPanel({
         </div>
 
         {(isLocalhost || mode === "local") && (
-          <p className="mt-4 rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-[12px] font-medium leading-relaxed text-gp-sub">
+          <p className="mt-4 rounded-xl border border-gp-border bg-gp-elevated p-3 text-[12px] font-medium leading-relaxed text-gp-sub">
             {mode === "local"
               ? "Realtime is running in local browser mode right now. Click “Open phone view in a new tab” above to test side by side."
               : "You are on localhost, which a separate phone cannot reach yet. Use the deployed Vercel URL for cross-device phone testing."}
@@ -763,7 +757,7 @@ function WaitingPanel({
 }
 
 function Card({ children }: { children: React.ReactNode }) {
-  return <section className="rounded-2xl border border-gp-border bg-gp-card p-4 shadow-xs">{children}</section>;
+  return <section className="rounded-2xl border border-gp-border bg-gp-card p-4 shadow-2xs">{children}</section>;
 }
 
 function SectionTitle({

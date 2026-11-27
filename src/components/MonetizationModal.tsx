@@ -4,16 +4,17 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import {
   ArrowLeft,
-  ArrowRight,
   Building2,
   Calculator,
   CheckCircle2,
-  HeartHandshake,
+  Clock,
   Layers,
-  PlugZap,
+  MapPin,
+  Megaphone,
   ShieldCheck,
-  TrendingUp,
+  Smartphone,
   Users,
+  Wallet,
   X,
 } from "lucide-react";
 import { Logo } from "./Logo";
@@ -21,89 +22,92 @@ import { AppearanceBar } from "@/lib/preferences";
 
 export const MONETIZATION_PILLARS = [
   {
-    id: "sdk",
-    tag: "Primary Revenue Engine · B2B",
-    title: "White-Label Regulated Support SDK",
-    price: "$1,500 - $5,000 / mo",
-    unit: "or $0.05 per Monthly Active User",
-    margin: "88% gross margin",
+    id: "business",
+    tag: "Primary B2B Engine · Setup + Recurring",
+    title: "Business Systems & Customer Service",
+    price: "$2,000 setup + $499/mo",
+    unit: "Starter (5 seats) · Pro $1,299/mo (20 seats)",
+    shareLabel: "72% of Yr-1 Rev",
+    barPct: 72,
     icon: Building2,
-    accent: "text-laser bg-laser/15",
-    barPct: 52,
-    customers: "Credit unions, regional banks, wealth portals, telehealth, and Medicare apps.",
-    summary: "Drop-in mobile & web SDK for banks and healthcare apps to guide members visually with zero remote-takeover liability.",
+    accent: "text-gp-accent bg-laser/15",
+    customers: "Businesses, credit unions, healthcare portals, and service websites replacing support calls or generic AI.",
+    summary:
+      "Done-for-you visual help system built for a company's app or website, complete with offline non-AI default help and customer insights.",
     points: [
-      "Eliminates multi-million-dollar social engineering & AnyDesk fraud exposure.",
-      "Cuts $12-$25 average call-center support ticket cost by ~42% via faster visual resolution.",
-      "Includes tamper-evident metadata logs for SOC2, GLBA, and HIPAA audits.",
+      "Full white-glove setup ($2,000 one-time) configuring helper manager accounts and custom workflows.",
+      "Includes automated, offline-available non-AI default help inside Ask Help so common issues resolve immediately.",
+      "Dedicated Business Insights Portal reporting most-asked questions, stuck screens, and client demographics.",
     ],
   },
   {
-    id: "seats",
-    title: "Helpdesk Seat Licensing",
-    tag: "Recurring SaaS · B2B",
-    price: "$49 / agent / mo",
-    unit: "billed annually per support seat",
-    margin: "84% gross margin",
-    icon: HeartHandshake,
-    accent: "text-volt bg-volt/15",
-    barPct: 24,
-    customers: "Senior living communities, community telecoms/ISPs, municipal digital-literacy desks, and credit union reps.",
-    summary: "Browser-based Helper Console seats for organizations supporting older adults and non-technical customers.",
-    points: [
-      "Zero install for customers: start sessions in 3 seconds via SMS link or QR scan.",
-      "Mandatory Privacy Shield guarantees agents never view member balances or passwords.",
-      "One-click Local AI triage offloads routine 'where do I tap?' tickets automatically.",
-    ],
-  },
-  {
-    id: "api",
-    title: "Usage-Based Support Platform API",
-    tag: "Channel Partnerships · B2B2C",
-    price: "$0.20 / session",
-    unit: "marketplace add-on & API metering",
-    margin: "80% gross margin",
-    icon: PlugZap,
-    accent: "text-emerald-500 bg-emerald-500/15",
-    barPct: 14,
-    customers: "Zendesk, Intercom, Twilio Flex, Genesys, and Salesforce Service Cloud ecosystems.",
-    summary: "Metered 'Launch Pointr Session' button embedded right inside existing enterprise ticketing tools.",
-    points: [
-      "Zero workflow switching for support teams already inside Zendesk or Intercom.",
-      "Pay-as-you-go session metering scales cleanly from 500 to 500,000 monthly sessions.",
-      "Built-in 20-30% app-marketplace revenue share drives low-CAC distribution.",
-    ],
-  },
-  {
-    id: "family",
-    title: "Trusted Circle Family Plus",
-    tag: "Viral Growth Loop · B2C Freemium",
-    price: "$4.99 / mo",
-    unit: "or $39 / year (1-on-1 free forever)",
-    margin: "90% gross margin",
+    id: "families",
+    tag: "Consumer Subscription · Moderate Use",
+    title: "Families Membership",
+    price: "$6.99 / mo",
+    unit: "or $59 / year (up to 5 family members)",
+    shareLabel: "15% of Yr-1 Rev",
+    barPct: 15,
     icon: Users,
-    accent: "text-sky-500 bg-sky-500/15",
-    barPct: 10,
-    customers: "Adult children supporting aging parents and grandparents across households.",
-    summary: "Free 1-on-1 family pairing fuels organic word-of-mouth; Family Plus unlocks multi-helper circles & saved guides.",
+    accent: "text-gp-sage bg-volt/15",
+    customers: "Everyday families helping an elderly parent, grandparent, or child with regular tech tasks.",
+    summary:
+      "Simple monthly membership linking up to 5 family members in a pre-paired Trusted Circle with Mandatory Privacy Shield.",
     points: [
-      "Free tier: 1 paired trusted helper with unlimited visual & Local AI sessions.",
-      "Family Plus: up to 6 trusted family devices, saved replayable walkthroughs, and scam-call alerts.",
-      "Every consumer user introduces GetPointr to their workplace, credit union, or care provider.",
+      "Covers moderate everyday family support without per-minute stress.",
+      "Pre-paired Trusted Circle blocks cold-call scammers while keeping balances and 2FA codes blurred.",
+      "Ad-free onboarding experience plus saved step-by-step replayable guides.",
+    ],
+  },
+  {
+    id: "ads",
+    tag: "Partner Sponsorships · Free Tier",
+    title: "Onboarding App Advertising",
+    price: "$350 / mo",
+    unit: "per local sponsor slot (or $15 CPM)",
+    shareLabel: "9% of Yr-1 Rev",
+    barPct: 9,
+    icon: Megaphone,
+    accent: "text-gp-sub bg-gp-elevated",
+    customers: "Local credit unions, senior living communities, regional telecoms, and neighborhood pharmacies.",
+    summary:
+      "Tasteful partner logos and short sponsor placements inside the onboarding app for free and one-off users.",
+    points: [
+      "Reaches high-trust local families and seniors right inside their zip code.",
+      "Never shown inside paid Business Systems or paid Families Membership accounts.",
+      "Natural upsell path turning local ad sponsors into full $499/mo Business System clients.",
+    ],
+  },
+  {
+    id: "session",
+    tag: "Pay-As-You-Go · One-Time Help",
+    title: "Per-Session Use",
+    price: "$2.99 / session",
+    unit: "up to 30 min (+$1.50 per extra 15 min)",
+    shareLabel: "4% of Yr-1 Rev",
+    barPct: 4,
+    icon: Clock,
+    accent: "text-gp-accent bg-laser/15",
+    customers: "Occasional users who only need help once at a time without a monthly plan.",
+    summary:
+      "Both sides create a quick account on the onboarding app and pay for a single session or time block on demand.",
+    points: [
+      "Zero monthly commitment: pay only when a tricky task comes up.",
+      "Fraction of the cost of an in-person $25-$50 tech visit.",
+      "Seamless one-tap upgrade to the $6.99/mo Families plan after 2+ sessions.",
     ],
   },
 ];
 
 export function MonetizationContent({ onClose, standalone = false }: { onClose?: () => void; standalone?: boolean }) {
-  const [monthlyCalls, setMonthlyCalls] = useState(12000);
-  const [costPerCall, setCostPerCall] = useState(18);
+  const [replacedCalls, setReplacedCalls] = useState(300);
+  const [costPerCall, setCostPerCall] = useState(16);
 
-  // Interactive ROI model for a mid-sized credit union / care network
-  const timeSavedPct = 0.42;
-  const grossMonthlySavings = Math.round(monthlyCalls * costPerCall * timeSavedPct);
-  const sdkMonthlyCost = monthlyCalls <= 10000 ? 2500 : monthlyCalls <= 30000 ? 4000 : 6500;
-  const netAnnualRoi = (grossMonthlySavings - sdkMonthlyCost) * 12;
-  const paybackDays = Math.max(2, Math.round((sdkMonthlyCost / grossMonthlySavings) * 30));
+  // Simple, transparent B2B monthly savings math
+  const planCost = replacedCalls <= 400 ? 499 : 1299;
+  const planName = replacedCalls <= 400 ? "Starter ($499/mo)" : "Pro ($1,299/mo)";
+  const grossSaved = replacedCalls * costPerCall;
+  const netMonthlySavings = grossSaved - planCost;
 
   return (
     <div className="mx-auto w-full max-w-5xl">
@@ -120,8 +124,8 @@ export function MonetizationContent({ onClose, standalone = false }: { onClose?:
           ) : (
             <Logo size={28} />
           )}
-          <span className="rounded-full bg-laser/15 px-3 py-1 text-[12px] font-bold text-laser">
-            Business Model &amp; Unit Economics
+          <span className="rounded-full bg-laser/15 px-3 py-1 text-[12px] font-bold text-gp-accent">
+            Pricing, Costs &amp; Year-1 Plan
           </span>
         </div>
         <div className="flex items-center gap-2">
@@ -130,7 +134,7 @@ export function MonetizationContent({ onClose, standalone = false }: { onClose?:
             <button
               type="button"
               onClick={onClose}
-              aria-label="Close monetization blueprint"
+              aria-label="Close monetization plan"
               className="inline-flex h-10 cursor-pointer items-center gap-1.5 rounded-xl border border-gp-border bg-gp-card px-3.5 text-[0.88rem] font-bold text-gp-text transition-colors hover:bg-gp-hover"
             >
               <X className="h-4 w-4" /> Close
@@ -139,216 +143,258 @@ export function MonetizationContent({ onClose, standalone = false }: { onClose?:
         </div>
       </div>
 
-      {/* Hero summary */}
-      <div className="mt-6 grid gap-6 lg:grid-cols-[1.2fr_0.8fr] lg:items-center">
+      {/* Plain-English Overview + Revenue Mix Bar */}
+      <div className="mt-6 grid gap-6 lg:grid-cols-[1.15fr_0.85fr] lg:items-center">
         <div>
-          <h1 className="text-[2rem] font-extrabold leading-tight tracking-tight text-gp-text sm:text-[2.5rem]">
-            B2B Enterprise Protection Powered by Viral Family Trust
+          <h1 className="text-[1.95rem] font-extrabold leading-tight tracking-tight text-gp-text sm:text-[2.35rem]">
+            Simple Pricing Built for Families, One-Time Users &amp; Businesses
           </h1>
-          <p className="mt-3 text-[1rem] font-medium leading-relaxed text-gp-sub">
-            GetPointr monetizes where remote-access scams and support calls hurt the bottom line most: credit unions,
-            healthcare portals, and senior support desks, while a free 1-on-1 family tier drives zero-CAC consumer
-            adoption.
+          <p className="mt-3 text-[0.98rem] font-medium leading-relaxed text-gp-sub">
+            Everyone starts on one unified GetPointr onboarding app with role-based accounts (General User, Helper, or
+            Business). Families and occasional users get affordable peace of mind, while done-for-you Business Systems
+            drive high-margin recurring revenue.
           </p>
         </div>
 
-        {/* Projected Revenue Mix Visual */}
-        <div className="rounded-2xl border border-gp-border bg-gp-card p-5 shadow-sm">
+        <div className="rounded-2xl border border-gp-border bg-gp-card p-5 shadow-2xs">
           <div className="flex items-center justify-between text-[12px] font-bold uppercase tracking-wider text-gp-muted">
             <span className="flex items-center gap-1.5">
-              <Layers className="h-4 w-4 text-laser" /> Target ARR Revenue Mix
+              <Layers className="h-4 w-4 text-gp-accent" /> Month-12 Revenue Mix
             </span>
-            <span className="text-emerald-500">~86% Blended Margin</span>
+            <span className="text-gp-sage">$15,895 / mo (~78% net margin)</span>
           </div>
           <div className="mt-3 flex h-4 w-full overflow-hidden rounded-full bg-gp-elevated p-0.5">
-            <div style={{ width: "52%" }} className="h-full rounded-l-full bg-laser" title="White-Label SDK (52%)" />
-            <div style={{ width: "24%" }} className="h-full bg-volt" title="Helpdesk Seats (24%)" />
-            <div style={{ width: "14%" }} className="h-full bg-emerald-500" title="Usage API (14%)" />
-            <div style={{ width: "10%" }} className="h-full rounded-r-full bg-sky-500" title="Family Plus (10%)" />
+            <div style={{ width: "72%" }} className="h-full rounded-l-full bg-laser" title="Business Systems (72%)" />
+            <div style={{ width: "15%" }} className="h-full bg-volt" title="Families Membership (15%)" />
+            <div style={{ width: "9%" }} className="h-full bg-[#7d899b]" title="Onboarding App Ads (9%)" />
+            <div style={{ width: "4%" }} className="h-full rounded-r-full bg-[#9dbcd8]" title="Per-Session Use (4%)" />
           </div>
           <div className="mt-3 grid grid-cols-2 gap-2 text-[12px] font-semibold">
             <span className="flex items-center gap-2 text-gp-sub">
-              <span className="h-2.5 w-2.5 rounded-full bg-laser" /> 52% Banking &amp; Health SDK
+              <span className="h-2.5 w-2.5 rounded-full bg-laser" /> 72% Business Systems
             </span>
             <span className="flex items-center gap-2 text-gp-sub">
-              <span className="h-2.5 w-2.5 rounded-full bg-volt" /> 24% Helpdesk Seats
+              <span className="h-2.5 w-2.5 rounded-full bg-volt" /> 15% Families ($6.99/mo)
             </span>
             <span className="flex items-center gap-2 text-gp-sub">
-              <span className="h-2.5 w-2.5 rounded-full bg-emerald-500" /> 14% Usage API
+              <span className="h-2.5 w-2.5 rounded-full bg-[#7d899b]" /> 9% App Sponsor Ads
             </span>
             <span className="flex items-center gap-2 text-gp-sub">
-              <span className="h-2.5 w-2.5 rounded-full bg-sky-500" /> 10% Family Plus
+              <span className="h-2.5 w-2.5 rounded-full bg-[#9dbcd8]" /> 4% Per-Session ($2.99)
             </span>
           </div>
         </div>
       </div>
 
-      {/* 4 Detailed Revenue Pillars */}
+      {/* 4 Revenue Streams */}
       <div className="mt-8 grid gap-4 md:grid-cols-2">
         {MONETIZATION_PILLARS.map((p) => {
           const Icon = p.icon;
           return (
-            <div
-              key={p.id}
-              className="flex flex-col rounded-2xl border border-gp-border bg-gp-card p-5 shadow-xs"
-            >
+            <div key={p.id} className="flex flex-col rounded-2xl border border-gp-border bg-gp-card p-5 shadow-2xs">
               <div className="flex items-start justify-between gap-3">
                 <span className={`grid h-11 w-11 shrink-0 place-items-center rounded-xl ${p.accent}`}>
                   <Icon className="h-5 w-5" />
                 </span>
                 <div className="text-right">
-                  <div className="text-[1.2rem] font-extrabold text-gp-text">{p.price}</div>
+                  <div className="text-[1.15rem] font-extrabold text-gp-text">{p.price}</div>
                   <div className="text-[11px] font-semibold text-gp-muted">{p.unit}</div>
                 </div>
               </div>
-              <div className="mt-3 text-[11px] font-bold uppercase tracking-wider text-laser">{p.tag}</div>
-              <h2 className="mt-0.5 text-[1.18rem] font-extrabold text-gp-text">{p.title}</h2>
+              <div className="mt-3 text-[11px] font-bold uppercase tracking-wider text-gp-accent">{p.tag}</div>
+              <h2 className="mt-0.5 text-[1.15rem] font-extrabold text-gp-text">{p.title}</h2>
               <p className="mt-1.5 text-[0.9rem] font-medium leading-relaxed text-gp-sub">{p.summary}</p>
               <div className="mt-3 rounded-xl bg-gp-elevated px-3 py-2 text-[12px] font-semibold text-gp-sub">
-                <span className="font-bold text-gp-text">Buyers: </span>
+                <span className="font-bold text-gp-text">Who it is for: </span>
                 {p.customers}
               </div>
               <ul className="mt-3 space-y-1.5 text-[0.86rem] font-medium text-gp-sub">
                 {p.points.map((pt) => (
                   <li key={pt} className="flex items-start gap-2">
-                    <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-500" />
+                    <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-gp-sage" />
                     <span>{pt}</span>
                   </li>
                 ))}
               </ul>
-              <div className="mt-auto pt-4">
-                <div className="flex items-center justify-between text-[11px] font-bold text-gp-muted">
-                  <span>Share of projected ARR: {p.barPct}%</span>
-                  <span className="text-emerald-500">{p.margin}</span>
-                </div>
-              </div>
             </div>
           );
         })}
       </div>
 
-      {/* Interactive Enterprise ROI Calculator + Go-To-Market Flywheel */}
-      <div className="mt-8 grid gap-5 lg:grid-cols-[1.15fr_0.85fr]">
-        <div className="rounded-2xl border border-gp-border bg-gp-card p-5 shadow-sm">
-          <div className="flex items-center gap-2 text-[12px] font-bold uppercase tracking-wider text-laser">
-            <Calculator className="h-4 w-4" /> Interactive Credit Union ROI Estimator
+      {/* How the 2-Part System Works */}
+      <div className="mt-8 rounded-2xl border border-gp-border bg-gp-card p-5 shadow-2xs">
+        <div className="flex items-center gap-2 text-[12px] font-bold uppercase tracking-wider text-gp-accent">
+          <Smartphone className="h-4 w-4" /> How Our Platform Operates
+        </div>
+        <h3 className="mt-1 text-[1.2rem] font-extrabold text-gp-text">
+          One Onboarding App, Three Tailored Experiences
+        </h3>
+        <div className="mt-4 grid gap-3 md:grid-cols-3">
+          <div className="rounded-xl bg-gp-elevated p-3.5">
+            <div className="text-[12px] font-bold uppercase tracking-wide text-gp-accent">1. General User Account</div>
+            <p className="mt-1 text-[0.86rem] font-medium leading-relaxed text-gp-sub">
+              Person needing help signs in once, sets privacy preferences, and opens the exact app or website they need
+              guidance on while keeping 100% tap control.
+            </p>
           </div>
-          <h3 className="mt-1 text-[1.2rem] font-extrabold text-gp-text">
-            Why Enterprise Buyers Say Yes Immediately
-          </h3>
-          <p className="mt-1 text-[0.88rem] font-medium text-gp-sub">
-            Adjust monthly app-support call volume and average ticket cost to see net annual savings from a 42% faster
-            visual resolution rate (before even counting prevented scam losses).
-          </p>
+          <div className="rounded-xl bg-gp-elevated p-3.5">
+            <div className="text-[12px] font-bold uppercase tracking-wide text-gp-sage">2. Helper Account</div>
+            <p className="mt-1 text-[0.86rem] font-medium leading-relaxed text-gp-sub">
+              Trusted family members or support reps get role-based access controls, visual pointer tools (Rings,
+              Arrows, Steps, Live Laser), and zero ability to tap remotely.
+            </p>
+          </div>
+          <div className="rounded-xl bg-gp-elevated p-3.5">
+            <div className="text-[12px] font-bold uppercase tracking-wide text-gp-text">3. Business Portal</div>
+            <p className="mt-1 text-[0.86rem] font-medium leading-relaxed text-gp-sub">
+              Separate organized platform with multi-seat helper managers, custom offline non-AI default help in Ask
+              Help, plus analytics on top questions and client demographics.
+            </p>
+          </div>
+        </div>
+      </div>
 
-          <div className="mt-4 space-y-4">
-            <div>
-              <div className="flex justify-between text-[0.86rem] font-bold">
-                <label htmlFor="calls-slider" className="text-gp-sub">
-                  Monthly Assisted Support Calls
-                </label>
-                <span className="font-mono text-gp-text">{monthlyCalls.toLocaleString()} calls / mo</span>
+      {/* Costs + Year-1 Numbers + Interactive Business Calculator */}
+      <div className="mt-8 grid gap-5 lg:grid-cols-2">
+        {/* Realistic Costs & Month-12 P&L */}
+        <div className="flex flex-col justify-between rounded-2xl border border-gp-border bg-gp-card p-5 shadow-2xs">
+          <div>
+            <div className="flex items-center gap-2 text-[12px] font-bold uppercase tracking-wider text-gp-sage">
+              <Wallet className="h-4 w-4" /> Realistic Costs &amp; Month-12 Numbers
+            </div>
+            <h3 className="mt-1 text-[1.18rem] font-extrabold text-gp-text">
+              Lean Monthly Overhead, Strong Day-One Margins
+            </h3>
+
+            <div className="mt-4 divide-y divide-gp-border rounded-xl border border-gp-border bg-gp-elevated px-3.5 text-[0.86rem]">
+              <div className="flex justify-between py-2.5">
+                <span className="font-medium text-gp-sub">Core Tech (Vercel, Supabase, Stores, OTP)</span>
+                <span className="font-mono font-bold text-gp-text">~$180 / mo</span>
               </div>
-              <input
-                id="calls-slider"
-                type="range"
-                min={2000}
-                max={50000}
-                step={1000}
-                value={monthlyCalls}
-                onChange={(e) => setMonthlyCalls(Number(e.target.value))}
-                className="mt-1.5 w-full cursor-pointer accent-laser"
-              />
+              <div className="flex justify-between py-2.5">
+                <span className="font-medium text-gp-sub">Stripe &amp; App Store Fees (~3% web, 15% app)</span>
+                <span className="font-mono font-bold text-gp-text">~$730 / mo</span>
+              </div>
+              <div className="flex justify-between py-2.5">
+                <span className="font-medium text-gp-sub">B2B Setup Labor (2 new businesses/mo)</span>
+                <span className="font-mono font-bold text-gp-text">~$1,000 / mo</span>
+              </div>
+              <div className="flex justify-between py-2.5">
+                <span className="font-medium text-gp-sub">Marketing (Local Events, Geofenced &amp; Social)</span>
+                <span className="font-mono font-bold text-gp-text">~$1,500 / mo</span>
+              </div>
+              <div className="flex justify-between py-2.5">
+                <span className="font-bold text-gp-text">Total Month-12 Operating Costs</span>
+                <span className="font-mono font-extrabold text-gp-text">~$3,410 / mo</span>
+              </div>
             </div>
 
-            <div>
-              <div className="flex justify-between text-[0.86rem] font-bold">
-                <label htmlFor="cost-slider" className="text-gp-sub">
-                  Avg. Call-Center Cost per Ticket
-                </label>
-                <span className="font-mono text-gp-text">${costPerCall} / call</span>
+            <div className="mt-3 rounded-xl bg-gp-elevated p-3 text-[12px] font-medium text-gp-sub">
+              <div className="flex items-center gap-1.5 font-bold text-gp-text">
+                <MapPin className="h-3.5 w-3.5 text-gp-accent" /> Customer Acquisition Channels
               </div>
-              <input
-                id="cost-slider"
-                type="range"
-                min={10}
-                max={30}
-                step={1}
-                value={costPerCall}
-                onChange={(e) => setCostPerCall(Number(e.target.value))}
-                className="mt-1.5 w-full cursor-pointer accent-laser"
-              />
+              <p className="mt-1 leading-relaxed">
+                Local community &amp; senior events (~$15 CAC), geofenced ads around bank branches and senior centers
+                (~$25 CAC), and short-form social media demos.
+              </p>
             </div>
           </div>
 
-          <div className="mt-5 grid grid-cols-3 gap-2.5 rounded-2xl bg-gp-elevated p-3.5 text-center">
+          <div className="mt-4 grid grid-cols-3 gap-2 rounded-2xl border border-gp-border bg-gp-surface p-3 text-center">
             <div>
-              <div className="text-[11px] font-bold uppercase text-gp-muted">SDK License</div>
-              <div className="mt-0.5 font-mono text-[1.1rem] font-extrabold text-gp-text">
-                ${sdkMonthlyCost.toLocaleString()}/mo
-              </div>
+              <div className="text-[10px] font-bold uppercase text-gp-muted">Month-12 Rev</div>
+              <div className="mt-0.5 font-mono text-[1.02rem] font-extrabold text-gp-text">$15,895/mo</div>
             </div>
             <div>
-              <div className="text-[11px] font-bold uppercase text-gp-muted">Payback Period</div>
-              <div className="mt-0.5 font-mono text-[1.1rem] font-extrabold text-laser">{paybackDays} days</div>
+              <div className="text-[10px] font-bold uppercase text-gp-muted">Annual Run-Rate</div>
+              <div className="mt-0.5 font-mono text-[1.02rem] font-extrabold text-gp-accent">$190,740/yr</div>
             </div>
             <div>
-              <div className="text-[11px] font-bold uppercase text-gp-muted">Net Annual ROI</div>
-              <div className="mt-0.5 font-mono text-[1.1rem] font-extrabold text-emerald-500">
-                +${netAnnualRoi.toLocaleString()}
-              </div>
+              <div className="text-[10px] font-bold uppercase text-gp-muted">Net Profit</div>
+              <div className="mt-0.5 font-mono text-[1.02rem] font-extrabold text-gp-sage">+$12,485/mo</div>
             </div>
           </div>
         </div>
 
-        {/* Go-To-Market Flywheel Visual */}
-        <div className="flex flex-col justify-between rounded-2xl border border-gp-border bg-gp-card p-5 shadow-sm">
+        {/* Simple Business Savings Calculator */}
+        <div className="flex flex-col justify-between rounded-2xl border border-gp-border bg-gp-card p-5 shadow-2xs">
           <div>
-            <div className="flex items-center gap-2 text-[12px] font-bold uppercase tracking-wider text-volt">
-              <TrendingUp className="h-4 w-4" /> Go-To-Market Flywheel
+            <div className="flex items-center gap-2 text-[12px] font-bold uppercase tracking-wider text-gp-accent">
+              <Calculator className="h-4 w-4" /> Business Customer Savings Estimator
             </div>
-            <h3 className="mt-1 text-[1.2rem] font-extrabold text-gp-text">Zero-CAC Bottom-Up Expansion</h3>
-            <ol className="mt-4 space-y-3 text-[0.88rem]">
-              {[
-                {
-                  step: "1",
-                  title: "Free Family Pairing",
-                  desc: "Adult children pair their laptop with Mom's phone in person to help safely.",
-                },
-                {
-                  step: "2",
-                  title: "Local AI Reduces Friction",
-                  desc: "Parents solve everyday questions solo via the 100% on-device Local AI guide.",
-                },
-                {
-                  step: "3",
-                  title: "Senior Living & Telecom Seats",
-                  desc: "Care desks adopt $49/mo Helper Console seats after seeing families use it.",
-                },
-                {
-                  step: "4",
-                  title: "Enterprise Banking SDK",
-                  desc: "Credit unions embed the White-Label SDK to eliminate AnyDesk fraud & cut call times.",
-                },
-              ].map((item) => (
-                <li key={item.step} className="flex items-start gap-3 rounded-xl bg-gp-elevated p-2.5">
-                  <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-laser text-[12px] font-extrabold text-white">
-                    {item.step}
-                  </span>
-                  <div>
-                    <div className="font-bold text-gp-text">{item.title}</div>
-                    <div className="text-[12px] font-medium text-gp-sub">{item.desc}</div>
-                  </div>
-                </li>
-              ))}
-            </ol>
+            <h3 className="mt-1 text-[1.18rem] font-extrabold text-gp-text">
+              Why Businesses Happily Pay $499 - $1,299/mo
+            </h3>
+            <p className="mt-1 text-[0.86rem] font-medium text-gp-sub">
+              Slide to estimate how many support phone calls a business replaces each month using GetPointr visual
+              guidance and offline non-AI help flows:
+            </p>
+
+            <div className="mt-4 space-y-4">
+              <div>
+                <div className="flex justify-between text-[0.86rem] font-bold">
+                  <label htmlFor="calls-slider" className="text-gp-sub">
+                    Phone Calls Replaced per Month
+                  </label>
+                  <span className="font-mono text-gp-text">{replacedCalls.toLocaleString()} calls</span>
+                </div>
+                <input
+                  id="calls-slider"
+                  type="range"
+                  min={50}
+                  max={1500}
+                  step={25}
+                  value={replacedCalls}
+                  onChange={(e) => setReplacedCalls(Number(e.target.value))}
+                  className="mt-1.5 w-full cursor-pointer accent-laser"
+                />
+              </div>
+
+              <div>
+                <div className="flex justify-between text-[0.86rem] font-bold">
+                  <label htmlFor="cost-slider" className="text-gp-sub">
+                    Average Cost per Phone Support Call
+                  </label>
+                  <span className="font-mono text-gp-text">${costPerCall} / call</span>
+                </div>
+                <input
+                  id="cost-slider"
+                  type="range"
+                  min={10}
+                  max={28}
+                  step={1}
+                  value={costPerCall}
+                  onChange={(e) => setCostPerCall(Number(e.target.value))}
+                  className="mt-1.5 w-full cursor-pointer accent-laser"
+                />
+              </div>
+            </div>
           </div>
 
-          <div className="mt-4 flex items-center justify-between rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-3.5 py-2.5 text-[12px] font-bold text-emerald-600 dark:text-emerald-300">
-            <span className="flex items-center gap-1.5">
-              <ShieldCheck className="h-4 w-4" /> Zero media relay servers = ultra-low infra cost
-            </span>
-            <ArrowRight className="h-4 w-4" />
+          <div className="mt-5 space-y-3">
+            <div className="grid grid-cols-3 gap-2 rounded-2xl bg-gp-elevated p-3.5 text-center">
+              <div>
+                <div className="text-[10px] font-bold uppercase text-gp-muted">Suggested Plan</div>
+                <div className="mt-0.5 text-[0.86rem] font-extrabold text-gp-text">{planName}</div>
+              </div>
+              <div>
+                <div className="text-[10px] font-bold uppercase text-gp-muted">Call Costs Saved</div>
+                <div className="mt-0.5 font-mono text-[1.02rem] font-extrabold text-gp-accent">
+                  ${grossSaved.toLocaleString()}/mo
+                </div>
+              </div>
+              <div>
+                <div className="text-[10px] font-bold uppercase text-gp-muted">Net Client Savings</div>
+                <div className="mt-0.5 font-mono text-[1.02rem] font-extrabold text-gp-sage">
+                  +${netMonthlySavings.toLocaleString()}/mo
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 rounded-xl border border-gp-border bg-gp-surface px-3.5 py-2.5 text-[12px] font-semibold text-gp-sub">
+              <ShieldCheck className="h-4 w-4 shrink-0 text-gp-sage" />
+              Replacing just ~32 support calls a month pays for the entire $499/mo Business Starter plan.
+            </div>
           </div>
         </div>
       </div>
@@ -372,7 +418,7 @@ export default function MonetizationModal({ open, onClose }: { open: boolean; on
     <div
       role="dialog"
       aria-modal="true"
-      aria-label="GetPointr Monetization Blueprint"
+      aria-label="GetPointr Monetization Plan"
       className="fixed inset-0 z-50 overflow-y-auto bg-gp-bg/95 p-4 backdrop-blur-md sm:p-8"
     >
       <div className="gp-rise rounded-3xl border border-gp-border bg-gp-surface p-5 shadow-2xl sm:p-8">

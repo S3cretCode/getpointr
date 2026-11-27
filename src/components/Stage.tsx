@@ -3,21 +3,27 @@ import type { ReactNode, Ref } from "react";
 /** Logical width of the mock phone. Everything inside the stage uses logical px. */
 export const W = 390;
 export const FRAME_PAD = 11;
-/** Extra logical height added by the iPhone status bar (44) + home indicator (22) when framed. */
-export const IPHONE_CHROME_H = 66;
+/** Extra logical height added by the iOS status bar (50) + home indicator (24) when framed. */
+export const IPHONE_CHROME_H = 74;
+
+/** Computes the exact scale factor so the full framed iPhone (including outer bezel) fits inside availW × availH. */
+export function fitStageScale(availW: number, availH: number, appH: number, maxScale = 1.04) {
+  const sw = (availW - FRAME_PAD * 2) / W;
+  const sh = (availH - FRAME_PAD * 2) / (appH + IPHONE_CHROME_H);
+  return Math.max(0.28, Math.min(sw, sh, maxScale));
+}
 
 /**
- * Renders children at a fixed logical size (W × height) and scales them
- * visually. Because `innerRef` always wraps only the app area (W × height),
- * pointer coordinates stay 1:1 between a real phone (unframed) and the
- * helper's iPhone mockup (framed).
+ * Renders children inside an authentic iPhone 16 Pro frame at logical size (W × height).
+ * Because `innerRef` always wraps only the app area (W × height), pointer coordinates
+ * stay 1:1 across mobile and desktop on both Host and Helper ends.
  */
 export function Stage({
   height,
   scale,
   children,
   innerRef,
-  framed = false,
+  framed = true,
   className = "",
 }: {
   height: number;
@@ -29,7 +35,10 @@ export function Stage({
 }) {
   if (!framed) {
     return (
-      <div className={`relative shrink-0 overflow-hidden ${className}`} style={{ width: W * scale, height: height * scale }}>
+      <div
+        className={`relative shrink-0 overflow-hidden ${className}`}
+        style={{ width: W * scale, height: height * scale }}
+      >
         <div
           ref={innerRef}
           className="absolute left-0 top-0"
@@ -51,33 +60,31 @@ export function Stage({
       className={`relative shrink-0 ${className}`}
       style={{ width: screenW + pad * 2, height: screenH + pad * 2 }}
     >
-      {/* Hardware side buttons */}
+      {/* Hardware side buttons (Action button, Volume Up/Down, Side Power) */}
       <span
         aria-hidden="true"
-        className="pointer-events-none absolute -left-[3px] top-[15%] h-6 w-[3px] rounded-l-sm bg-slate-600/90"
+        className="pointer-events-none absolute -left-[2.5px] top-[14.5%] h-5 w-[2.5px] rounded-l-sm bg-[#464e5c]"
       />
       <span
         aria-hidden="true"
-        className="pointer-events-none absolute -left-[3px] top-[23%] h-11 w-[3px] rounded-l-sm bg-slate-600/90"
+        className="pointer-events-none absolute -left-[2.5px] top-[22%] h-10 w-[2.5px] rounded-l-sm bg-[#464e5c]"
       />
       <span
         aria-hidden="true"
-        className="pointer-events-none absolute -left-[3px] top-[33%] h-11 w-[3px] rounded-l-sm bg-slate-600/90"
+        className="pointer-events-none absolute -left-[2.5px] top-[31%] h-10 w-[2.5px] rounded-l-sm bg-[#464e5c]"
       />
       <span
         aria-hidden="true"
-        className="pointer-events-none absolute -right-[3px] top-[26%] h-14 w-[3px] rounded-r-sm bg-slate-600/90"
+        className="pointer-events-none absolute -right-[2.5px] top-[25%] h-14 w-[2.5px] rounded-r-sm bg-[#464e5c]"
       />
 
-      {/* Titanium outer shell + black screen bezel */}
-      <div
-        className="relative h-full w-full rounded-[48px] bg-gradient-to-b from-[#3b4252] via-[#1c212b] to-[#2e3440] p-[3px] shadow-[0_28px_70px_-12px_rgba(0,0,0,0.85)] ring-1 ring-white/15"
-      >
+      {/* Brushed titanium shell + concentric black glass bezel */}
+      <div className="relative h-full w-full rounded-[50px] bg-gradient-to-b from-[#4a5260] via-[#262b34] to-[#383f4b] p-[2.5px] shadow-[0_26px_64px_-12px_rgba(0,0,0,0.75)] ring-1 ring-white/15">
         <div
-          className="relative h-full w-full overflow-hidden rounded-[45px] bg-black"
-          style={{ padding: pad - 3 }}
+          className="relative h-full w-full overflow-hidden rounded-[47.5px] bg-[#07080a]"
+          style={{ padding: pad - 2.5 }}
         >
-          <div className="relative h-full w-full overflow-hidden rounded-[38px] bg-white">
+          <div className="relative h-full w-full overflow-hidden rounded-[39px] bg-white">
             <div
               className="absolute left-0 top-0 flex flex-col bg-white"
               style={{
@@ -87,39 +94,72 @@ export function Stage({
                 transformOrigin: "0 0",
               }}
             >
-              {/* iOS Status Bar + Dynamic Island */}
+              {/* Authentic iOS 18 Status Bar + Dynamic Island */}
               <div
                 aria-hidden="true"
-                className="relative flex h-[44px] shrink-0 items-center justify-between bg-white px-6 text-slate-900"
+                className="relative flex h-[50px] shrink-0 items-center justify-between bg-white px-5 text-[#0b0f17]"
+                style={{
+                  fontFamily:
+                    '-apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", system-ui, sans-serif',
+                }}
               >
-                <span className="text-[14px] font-semibold tracking-tight">9:41</span>
-
-                {/* Dynamic Island */}
-                <div className="absolute left-1/2 top-[9px] flex h-[26px] w-[108px] -translate-x-1/2 items-center justify-end rounded-full bg-black pr-2.5 shadow-inner">
-                  <span className="h-2.5 w-2.5 rounded-full bg-[#111927] ring-1 ring-slate-700/70">
-                    <span className="block h-1 w-1 translate-x-[3px] translate-y-[2px] rounded-full bg-sky-400/40" />
+                {/* Left ear: iOS Semibold Time */}
+                <div className="flex w-[92px] items-center justify-center pl-1">
+                  <span
+                    style={{
+                      fontSize: 15.5,
+                      fontWeight: 600,
+                      letterSpacing: "-0.32px",
+                      lineHeight: 1,
+                    }}
+                  >
+                    9:41
                   </span>
                 </div>
 
-                {/* Signal + Wi-Fi + Battery */}
-                <div className="flex items-center gap-1.5">
-                  <svg width="16" height="11" viewBox="0 0 16 11" fill="currentColor">
-                    <rect x="0" y="7" width="2.6" height="4" rx="0.8" />
-                    <rect x="4.2" y="5" width="2.6" height="6" rx="0.8" />
-                    <rect x="8.4" y="2.5" width="2.6" height="8.5" rx="0.8" />
-                    <rect x="12.6" y="0" width="2.6" height="11" rx="0.8" />
+                {/* Center: Dynamic Island with recessed lens */}
+                <div className="absolute left-1/2 top-[9px] flex h-[33px] w-[120px] -translate-x-1/2 items-center justify-end rounded-full bg-black pr-3">
+                  <span className="relative grid h-[11px] w-[11px] place-items-center rounded-full bg-[#0e1420] ring-1 ring-white/10">
+                    <span className="h-[3.5px] w-[3.5px] -translate-x-[1px] -translate-y-[1px] rounded-full bg-[#5b86b0]/55" />
+                  </span>
+                </div>
+
+                {/* Right ear: Authentic iOS Cellular + Solid Wi-Fi Wedge + Battery Capsule */}
+                <div className="flex w-[92px] items-center justify-center gap-[6px] pr-1 text-[#0b0f17]">
+                  {/* 4-bar iOS cellular signal */}
+                  <svg width="17" height="11" viewBox="0 0 17 11" fill="currentColor">
+                    <rect x="0.2" y="7.2" width="3" height="3.8" rx="1" />
+                    <rect x="4.6" y="5.1" width="3" height="5.9" rx="1" />
+                    <rect x="9.0" y="2.6" width="3" height="8.4" rx="1" />
+                    <rect x="13.4" y="0.2" width="3" height="10.8" rx="1" />
                   </svg>
-                  <svg width="15" height="11" viewBox="0 0 16 12" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round">
-                    <path d="M1.5 4.2a9.5 9.5 0 0 1 13 0" />
-                    <path d="M4.2 7a5.6 5.6 0 0 1 7.6 0" />
-                    <circle cx="8" cy="10" r="1.1" fill="currentColor" stroke="none" />
+
+                  {/* Authentic iOS filled Wi-Fi fan */}
+                  <svg width="15.5" height="11" viewBox="0 0 16 11.5" fill="currentColor">
+                    <path d="M8 2.1c2.7 0 5.15 1 7.05 2.72a.45.45 0 0 0 .63-.02l.95-.98a.47.47 0 0 0-.02-.67A12.1 12.1 0 0 0 8 0C4.7 0 1.7 1.24-.61 3.05a.47.47 0 0 0-.02.67l.95.98c.17.18.45.19.63.02A10.25 10.25 0 0 1 8 2.1Z" transform="translate(0, 0.3) scale(0.95)" />
+                    <path d="M8 5.45c1.73 0 3.31.66 4.53 1.77.18.17.46.16.63-.02l.95-.99a.48.48 0 0 0-.03-.68A8.3 8.3 0 0 0 8 3.35c-2.36 0-4.5.93-6.08 2.18a.48.48 0 0 0-.03.68l.95.99c.17.18.45.19.63.02A6.5 6.5 0 0 1 8 5.45Z" />
+                    <path d="M9.85 9.15a2.45 2.45 0 0 0-3.7 0 .46.46 0 0 0 .02.64l1.52 1.54a.47.47 0 0 0 .66 0l1.52-1.54a.46.46 0 0 0-.02-.64Z" />
                   </svg>
-                  <div className="flex items-center gap-[1.5px]">
-                    <div className="flex h-[11px] w-[22px] items-center rounded-[3px] border border-slate-900/70 p-[1.5px]">
-                      <div className="h-full w-[82%] rounded-[1.5px] bg-slate-900" />
-                    </div>
-                    <span className="h-[4px] w-[1.5px] rounded-r-sm bg-slate-900/70" />
-                  </div>
+
+                  {/* Authentic iOS Battery */}
+                  <svg width="25" height="12" viewBox="0 0 25 12" fill="none">
+                    <rect
+                      x="0.6"
+                      y="0.8"
+                      width="21"
+                      height="10.4"
+                      rx="3.2"
+                      stroke="#0b0f17"
+                      strokeOpacity="0.38"
+                      strokeWidth="1.1"
+                    />
+                    <rect x="2.2" y="2.4" width="16.4" height="7.2" rx="1.8" fill="#0b0f17" />
+                    <path
+                      d="M23 4.2v3.6a1.8 1.8 0 0 0 0-3.6Z"
+                      fill="#0b0f17"
+                      fillOpacity="0.42"
+                    />
+                  </svg>
                 </div>
               </div>
 
@@ -131,9 +171,9 @@ export function Stage({
               {/* iOS Home Indicator */}
               <div
                 aria-hidden="true"
-                className="flex h-[22px] shrink-0 items-end justify-center bg-white pb-[7px]"
+                className="flex h-[24px] shrink-0 items-end justify-center bg-white pb-[7px]"
               >
-                <span className="h-[5px] w-[134px] rounded-full bg-slate-900/85" />
+                <span className="h-[5px] w-[136px] rounded-full bg-[#0b0f17]/88" />
               </div>
             </div>
           </div>

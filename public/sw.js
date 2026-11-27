@@ -1,5 +1,5 @@
 // GetPointr service worker: keeps the app installable and shows an offline page only when offline.
-const VERSION = "gp-v2";
+const VERSION = "gp-v3";
 const OFFLINE_URL = "/offline.html";
 
 self.addEventListener("install", (event) => {

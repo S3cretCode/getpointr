@@ -26,7 +26,7 @@ export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
   title: { default: "GetPointr | Point the way. Never take over.", template: "%s | GetPointr" },
   description:
-    "Remote help without remote control. A trusted helper guides you with glowing visual cues while you keep 100% control of your phone.",
+    "Remote help without remote control. A trusted helper guides you with calm visual cues while you keep 100% control of your phone.",
   applicationName: "GetPointr",
   appleWebApp: { capable: true, title: "GetPointr", statusBarStyle: "black-translucent" },
   icons: {
@@ -43,14 +43,20 @@ export const viewport: Viewport = {
   userScalable: false,
   viewportFit: "cover",
   themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#F4F7FB" },
-    { media: "(prefers-color-scheme: dark)", color: "#070B14" },
+    { media: "(prefers-color-scheme: light)", color: "#F6F5F0" },
+    { media: "(prefers-color-scheme: dark)", color: "#181C22" },
   ],
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html lang="en" data-theme="dark" data-text-scale="normal" className={`${jakarta.variable} ${jetbrains.variable} antialiased`} suppressHydrationWarning>
+    <html
+      lang="en"
+      data-theme="dark"
+      data-text-scale="normal"
+      className={`${jakarta.variable} ${jetbrains.variable} antialiased`}
+      suppressHydrationWarning
+    >
       <body>
         <PreferencesProvider>
           {children}
